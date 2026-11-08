@@ -1,0 +1,23 @@
+{
+  "country": "United States",
+  "default_password": "12345678",
+  "users_to_generate": 100,
+  "environment": "production",
+  "api_url": "https://adselect.net/api/auth/register",
+  "allow_remote_signup": true,
+  "sponsor": "ASD5437949",
+  "source_url": "https://adselect.net/register?ref=ASD5437949",
+  "output_dir": "output",
+  "log_level": "INFO",
+  "db_path": "output/test_users.db",
+  "csv_path": "output/test_users.csv",
+  "json_path": "output/test_users.json",
+  "results_path": "output/signup_results.json",
+  "request_delay_seconds": 2.0,
+  "request_max_retries": 2,
+  "batch_size": 10,
+  "batch_delay_seconds": 20.0,
+  "network_reset_command": "",
+  "network_reset_wait_seconds": 10.0,
+  "preflight_before_submit": true
+}
