@@ -95,6 +95,12 @@ class SQLiteManager:
         row = conn.execute("SELECT COUNT(*) AS c FROM users").fetchone()
         return int(row["c"]) if row else 0
 
+    def delete_user(self, username: str) -> None:
+        """Delete a user by username after successful submission."""
+        conn = self.connect()
+        conn.execute("DELETE FROM users WHERE username = ?", (username,))
+        conn.commit()
+
     def close(self) -> None:
         if self._conn is not None:
             self._conn.close()

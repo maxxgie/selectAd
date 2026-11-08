@@ -40,6 +40,7 @@ class Config:
     allow_remote_signup: bool = True
     sponsor: str = "ASD5437949"
     source_url: str = "https://adselect.net/register?ref=ASD5437949"
+    person_config_path: str = "config/person.json"
     output_dir: str = "output"
     log_level: str = "INFO"
     db_path: str = "output/test_users.db"
@@ -76,28 +77,37 @@ def load_config(config_path: str | Path | None = None) -> Config:
     else:
         logger.warning("Config file %s not found; using defaults", path)
 
+    # Load person/sponsor config (editable file for targeting different people)
+    person_data: dict[str, Any] = {}
+    person_path = Path(data.get("person_config_path", "config/person.json"))
+    if not person_path.is_absolute():
+        person_path = path.parent / person_path
+    if person_path.exists():
+        with person_path.open("r", encoding="utf-8") as fh:
+            person_data = json.load(fh)
+        logger.info("Loaded person config from %s", person_path)
+    else:
+        logger.warning("Person config %s not found; using config.json defaults", person_path)
+
     return Config(
-        country=os.environ.get("COUNTRY", data.get("country", "United States")),
+        country=os.environ.get("COUNTRY", person_data.get("country", data.get("country", "United States"))),
         default_password=os.environ.get(
-            "DEFAULT_PASSWORD", data.get("default_password", "12345678")
+            "DEFAULT_PASSWORD", person_data.get("default_password", data.get("default_password", "12345678"))
         ),
         users_to_generate=int(
             os.environ.get("USERS_TO_GENERATE", data.get("users_to_generate", 100))
         ),
         environment=os.environ.get("ENVIRONMENT", data.get("environment", "production")),
         api_url=os.environ.get(
-            "SIGNUP_API_URL", data.get("api_url", "https://adselect.net/api/auth/register")
+            "SIGNUP_API_URL", person_data.get("api_url", data.get("api_url", "https://adselect.net/api/auth/register"))
         ),
         allow_remote_signup=_parse_bool(
             os.environ.get("ALLOW_REMOTE_SIGNUP", data.get("allow_remote_signup", True))
         ),
-        sponsor=os.environ.get("SPONSOR", data.get("sponsor", "ASD5437949")),
+        sponsor=os.environ.get("SPONSOR", person_data.get("sponsor_id", data.get("sponsor", "ASD5437949"))),
         source_url=os.environ.get(
             "SOURCE_URL",
-            data.get(
-                "source_url",
-                f"https://adselect.net/register?ref={os.environ.get('SPONSOR', data.get('sponsor', 'ASD5437949'))}",
-            ),
+            person_data.get("source_url", data.get("source_url", f"https://adselect.net/register?ref={os.environ.get('SPONSOR', data.get('sponsor', 'ASD5437949'))}")),
         ),
         output_dir=os.environ.get("OUTPUT_DIR", data.get("output_dir", "output")),
         log_level=os.environ.get("LOG_LEVEL", data.get("log_level", "INFO")),
@@ -132,6 +142,7 @@ def load_config(config_path: str | Path | None = None) -> Config:
         preflight_before_submit=_parse_bool(
             os.environ.get("PREFLIGHT_BEFORE_SUBMIT", data.get("preflight_before_submit", True))
         ),
+        person_config_path=data.get("person_config_path", "config/person.json"),
     )
 
 

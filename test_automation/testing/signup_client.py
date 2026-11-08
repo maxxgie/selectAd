@@ -5,15 +5,18 @@ Submits signup/registration requests to the configured endpoint.
 
 from __future__ import annotations
 
+import json
 import logging
 import shlex
 import subprocess
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, List, Optional
 
 import requests
 
+from database.sqlite_manager import SQLiteManager
 from generators.user_generator import TestUser
 
 logger = logging.getLogger(__name__)
@@ -50,6 +53,7 @@ class SignupClient:
         network_reset_command: str = "",
         network_reset_wait_seconds: float = 10.0,
         source_url: str = "",
+        db_path: str = "output/test_users.db",
     ) -> None:
         self.api_url = (api_url or "").rstrip("/")
         self.timeout = timeout
@@ -63,6 +67,8 @@ class SignupClient:
         self.source_url = (source_url or "").strip() or (
             f"https://adselect.net/register?ref={sponsor}" if sponsor else "https://adselect.net/register"
         )
+        self.db_path = db_path
+        self._vpn_state_path = Path(self.db_path).parent / ".vpn_state.json"
 
         if not self.api_url:
             raise ValueError("api_url is required")
@@ -97,6 +103,28 @@ class SignupClient:
             info["api_status"] = r.status_code
         except Exception as exc:  # noqa: BLE001
             info["api_error"] = str(exc)
+
+        # VPN/server IP change detection
+        last_ip = None
+        if self._vpn_state_path.exists():
+            try:
+                state = json.loads(self._vpn_state_path.read_text(encoding="utf-8"))
+                last_ip = state.get("last_public_ip")
+            except Exception:  # noqa: BLE001
+                last_ip = None
+        info["vpn_ip_changed"] = last_ip is not None and last_ip != info.get("public_ip")
+        if info.get("vpn_ip_changed"):
+            logger.warning(
+                "VPN/server IP changed: %s -> %s", last_ip, info.get("public_ip")
+            )
+        try:
+            self._vpn_state_path.write_text(
+                json.dumps({"last_public_ip": info.get("public_ip")}, indent=2),
+                encoding="utf-8",
+            )
+        except Exception:  # noqa: BLE001
+            pass
+
         return info
 
     def _reset_network(self, reason: str) -> bool:
@@ -150,6 +178,11 @@ class SignupClient:
 
                 if 200 <= status_code < 300:
                     logger.info("Signup succeeded for %s (status %s)", user.username, status_code)
+                    try:
+                        with SQLiteManager(self.db_path) as db:
+                            db.delete_user(user.username)
+                    except Exception as exc:  # noqa: BLE001
+                        logger.error("Failed to delete submitted user %s from DB: %s", user.username, exc)
                     return SignupResult(
                         user=user, success=True, status_code=status_code, response=response_json
                     )

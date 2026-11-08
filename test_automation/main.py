@@ -65,6 +65,7 @@ def cmd_submit(args: argparse.Namespace, cfg) -> int:
         network_reset_command=cfg.network_reset_command,
         network_reset_wait_seconds=cfg.network_reset_wait_seconds,
         source_url=cfg.source_url,
+        db_path=cfg.db_path,
     )
     try:
         if getattr(cfg, "preflight_before_submit", True):
