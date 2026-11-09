@@ -101,6 +101,12 @@ class SQLiteManager:
         conn.execute("DELETE FROM users WHERE username = ?", (username,))
         conn.commit()
 
+    def delete_all_users(self) -> None:
+        """Delete all users from the database."""
+        conn = self.connect()
+        conn.execute("DELETE FROM users")
+        conn.commit()
+
     def close(self) -> None:
         if self._conn is not None:
             self._conn.close()

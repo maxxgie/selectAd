@@ -69,10 +69,11 @@ class TestUser:
 class UserGenerator:
     """Generates unique, realistic test users."""
 
-    def __init__(self, country: str = "United States", default_password: str = "12345678") -> None:
+    def __init__(self, country: str = "United States", default_password: str = "12345678", username_length: int = 8) -> None:
         self.faker = Faker()
         self.country = normalize_country(country)
         self.default_password = default_password
+        self.username_length = max(1, int(username_length))
         self._used_usernames: Set[str] = set()
         self._used_emails: Set[str] = set()
 
@@ -97,7 +98,7 @@ class UserGenerator:
 
     def _unique_username(self) -> str:
         for _ in range(100):
-            username = "".join(self.faker.random_elements(elements=("a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"), length=8, unique=False))
+            username = "".join(self.faker.random_elements(elements=("a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"), length=self.username_length, unique=False))
             if username not in self._used_usernames:
                 self._used_usernames.add(username)
                 return username
@@ -105,7 +106,7 @@ class UserGenerator:
 
     def _unique_email(self) -> str:
         for _ in range(100):
-            local = "".join(self.faker.random_elements(elements=("a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"), length=8, unique=False))
+            local = "".join(self.faker.random_elements(elements=("a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"), length=self.username_length, unique=False))
             email = f"{local}@gmail.com"
             if email not in self._used_emails:
                 self._used_emails.add(email)

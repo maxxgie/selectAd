@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 def cmd_generate(args: argparse.Namespace, cfg) -> int:
     count = args.count or cfg.users_to_generate
-    generator = UserGenerator(country=cfg.country, default_password=cfg.default_password)
+    generator = UserGenerator(country=cfg.country, default_password=cfg.default_password, username_length=cfg.username_length)
     users = generator.generate(count)
 
     with SQLiteManager(cfg.db_path) as db:
@@ -37,14 +37,22 @@ def cmd_generate(args: argparse.Namespace, cfg) -> int:
 
 
 def cmd_submit(args: argparse.Namespace, cfg) -> int:
-    limit = args.limit
+    count = args.limit or cfg.users_to_generate
+
+    # Delete old DB contents and start fresh
     with SQLiteManager(cfg.db_path) as db:
-        users = db.get_all_users()
-    if not users:
-        logger.error("No users found in database. Run `generate` first.")
-        return 1
-    if limit is not None:
-        users = users[: max(0, int(limit))]
+        db.delete_all_users()
+
+    generator = UserGenerator(country=cfg.country, default_password=cfg.default_password, username_length=cfg.username_length)
+    users = generator.generate(count)
+
+    with SQLiteManager(cfg.db_path) as db:
+        inserted = db.insert_users(users)
+    logger.info("Generated %d users for submission", inserted)
+
+    CSVExporter(cfg.csv_path).export(users)
+    JSONExporter(cfg.json_path).export(users)
+    logger.info("Exported users to %s and %s", cfg.csv_path, cfg.json_path)
 
     if not args.yes:
         print(f"About to submit {len(users)} registration(s) to: {cfg.api_url}")
@@ -71,9 +79,6 @@ def cmd_submit(args: argparse.Namespace, cfg) -> int:
         if getattr(cfg, "preflight_before_submit", True):
             pre = client.preflight()
             logger.info("Preflight: %s", pre)
-            if not pre.get("api_reachable"):
-                logger.error("Preflight failed: AdSelect endpoint is not reachable from this network.")
-                return 1
         results = client.run(users)
         summary = client.summary(results)
     finally:

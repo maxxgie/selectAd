@@ -44,10 +44,10 @@ class SignupClient:
         self,
         api_url: str,
         allow_remote: bool = False,
-        timeout: int = 30,
+        timeout: int = 10,
         sponsor: str = "",
-        delay_seconds: float = 1.0,
-        max_retries: int = 2,
+        delay_seconds: float = 0.5,
+        max_retries: int = 4,
         batch_size: int = 0,
         batch_delay_seconds: float = 0.0,
         network_reset_command: str = "",
@@ -191,7 +191,10 @@ class SignupClient:
                     continue
                 if status_code in {429, 500, 502, 503, 504, 522, 524} and attempt < self.max_retries:
                     retry_after = response.headers.get("Retry-After")
-                    wait = float(retry_after) if retry_after and retry_after.isdigit() else (2.0 * (attempt + 1))
+                    wait = min(
+                        float(retry_after) if retry_after and retry_after.isdigit() else (2.0 * (attempt + 1)),
+                        20.0,
+                    )
                     logger.warning(
                         "Signup retryable response for %s (status %s); waiting %.1fs",
                         user.username,
@@ -217,7 +220,7 @@ class SignupClient:
             except requests.RequestException as exc:
                 last_exc = exc
                 if attempt < self.max_retries:
-                    wait = 2.0 * (attempt + 1)
+                    wait = min(1.0 + (attempt * 1.5), 10.0)
                     logger.warning("Signup request error for %s: %s; retrying in %.1fs", user.username, exc, wait)
                     time.sleep(wait)
                     continue

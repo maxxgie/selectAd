@@ -54,6 +54,7 @@ class Config:
     network_reset_command: str = ""
     network_reset_wait_seconds: float = 10.0
     preflight_before_submit: bool = True
+    username_length: int = 8
 
 
 def _parse_bool(value: Any) -> bool:
@@ -142,6 +143,7 @@ def load_config(config_path: str | Path | None = None) -> Config:
         preflight_before_submit=_parse_bool(
             os.environ.get("PREFLIGHT_BEFORE_SUBMIT", data.get("preflight_before_submit", True))
         ),
+        username_length=int(os.environ.get("USERNAME_LENGTH", data.get("username_length", 8))),
         person_config_path=data.get("person_config_path", "config/person.json"),
     )
 

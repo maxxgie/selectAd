@@ -1,34 +1,171 @@
 {
   "summary": {
-    "total": 1,
-    "successful": 0,
-    "failed": 1,
-    "successful_users": [],
+    "total": 10,
+    "successful": 5,
+    "failed": 5,
+    "successful_users": [
+      "f5ohv9n4",
+      "jfvz1ncx",
+      "o0daujos",
+      "v2v34rb3",
+      "civ9nhjb"
+    ],
     "failed_users": [
-      "7yxzvm88"
+      "ruzi21al",
+      "wv874uf4",
+      "clr7hwx3",
+      "3rjfuxli",
+      "11uv7f8b"
     ],
     "errors": [
-      "{'error': 'Too many registrations from this network. Please try again later or use mobile data.'}"
+      "{'error': 'Email or phone already registered'}",
+      "{'error': 'Email or phone already registered'}",
+      "{'error': 'Email or phone already registered'}",
+      "{'error': 'Email or phone already registered'}",
+      "{'error': 'Email or phone already registered'}"
     ]
   },
   "preflight": {
     "api_reachable": true,
-    "public_ip": "89.39.106.191",
+    "public_ip": "103.216.221.93",
     "api_status": 200,
     "vpn_ip_changed": false
   },
   "results": [
     {
-      "username": "7yxzvm88",
-      "email": "sc5w84z2@gmail.com",
-      "phone": "3958594556",
+      "username": "ruzi21al",
+      "email": "ef98pdir@gmail.com",
+      "phone": "8326879726",
       "country": "United States",
       "success": false,
-      "status_code": 429,
+      "status_code": 400,
       "response": {
-        "error": "Too many registrations from this network. Please try again later or use mobile data."
+        "error": "Email or phone already registered"
       },
-      "error_message": "{'error': 'Too many registrations from this network. Please try again later or use mobile data.'}"
+      "error_message": "{'error': 'Email or phone already registered'}"
+    },
+    {
+      "username": "wv874uf4",
+      "email": "qm23pjl8@gmail.com",
+      "phone": "8394641861",
+      "country": "United States",
+      "success": false,
+      "status_code": 400,
+      "response": {
+        "error": "Email or phone already registered"
+      },
+      "error_message": "{'error': 'Email or phone already registered'}"
+    },
+    {
+      "username": "f5ohv9n4",
+      "email": "yol2ezy0@gmail.com",
+      "phone": "9505561256",
+      "country": "United States",
+      "success": true,
+      "status_code": 200,
+      "response": {
+        "success": true,
+        "userid": "ASD2661034",
+        "username": "f5ohv9n4",
+        "metaEventId": "reg.ASD2661034.1794167489655.6eda356e"
+      },
+      "error_message": null
+    },
+    {
+      "username": "jfvz1ncx",
+      "email": "f6zxojsx@gmail.com",
+      "phone": "4253778174",
+      "country": "United States",
+      "success": true,
+      "status_code": 200,
+      "response": {
+        "success": true,
+        "userid": "ASD1016739",
+        "username": "jfvz1ncx",
+        "metaEventId": "reg.ASD1016739.1794167494532.9aa7de34"
+      },
+      "error_message": null
+    },
+    {
+      "username": "o0daujos",
+      "email": "xql23h19@gmail.com",
+      "phone": "7978562590",
+      "country": "United States",
+      "success": true,
+      "status_code": 200,
+      "response": {
+        "success": true,
+        "userid": "ASD1872029",
+        "username": "o0daujos",
+        "metaEventId": "reg.ASD1872029.1794167498090.6f694df1"
+      },
+      "error_message": null
+    },
+    {
+      "username": "v2v34rb3",
+      "email": "ips7pto5@gmail.com",
+      "phone": "9333154395",
+      "country": "United States",
+      "success": true,
+      "status_code": 200,
+      "response": {
+        "success": true,
+        "userid": "ASD8372577",
+        "username": "v2v34rb3",
+        "metaEventId": "reg.ASD8372577.1794167504795.1ec98c4b"
+      },
+      "error_message": null
+    },
+    {
+      "username": "clr7hwx3",
+      "email": "dmnhd18l@gmail.com",
+      "phone": "9422260409",
+      "country": "United States",
+      "success": false,
+      "status_code": 400,
+      "response": {
+        "error": "Email or phone already registered"
+      },
+      "error_message": "{'error': 'Email or phone already registered'}"
+    },
+    {
+      "username": "3rjfuxli",
+      "email": "lh8kez3k@gmail.com",
+      "phone": "5836896800",
+      "country": "United States",
+      "success": false,
+      "status_code": 400,
+      "response": {
+        "error": "Email or phone already registered"
+      },
+      "error_message": "{'error': 'Email or phone already registered'}"
+    },
+    {
+      "username": "11uv7f8b",
+      "email": "3kau0kdw@gmail.com",
+      "phone": "9491575735",
+      "country": "United States",
+      "success": false,
+      "status_code": 400,
+      "response": {
+        "error": "Email or phone already registered"
+      },
+      "error_message": "{'error': 'Email or phone already registered'}"
+    },
+    {
+      "username": "civ9nhjb",
+      "email": "7elsfbif@gmail.com",
+      "phone": "1639532242",
+      "country": "United States",
+      "success": true,
+      "status_code": 200,
+      "response": {
+        "success": true,
+        "userid": "ASD9068279",
+        "username": "civ9nhjb",
+        "metaEventId": "reg.ASD9068279.1794167572599.c700f36c"
+      },
+      "error_message": null
     }
   ]
 }
