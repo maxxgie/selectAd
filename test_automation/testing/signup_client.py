@@ -575,33 +575,20 @@ proxy_check_url: str = "https://api.ipify.org",
         self._current_batch_index += 1
 
     def _mark_batch_rate_limited(self, batch_index: int) -> None:
-        """Mark a batch as rate-limited. Move to next batch immediately without exhausting all proxies."""
-        # If batch has some successful proxies, move them to rest pool
-        successful = self._batch_successful_proxies.get(batch_index, [])
-        if successful:
-            rest_until = time.time() + self._rest_duration_seconds
-            for proxy in successful:
-                self._rest_pool.append((proxy, rest_until))
-            logger.info("Batch %d rate-limited: %d successful proxies moved to rest pool", 
-                       batch_index + 1, len(successful))
-        
-        # Mark all remaining validated proxies as failed
+        """Mark remaining proxies in batch as failed so they are skipped, but don't exhaust the batch yet.
+        This allows the normal rotation to try other proxies in the batch before moving on."""
+        # Mark all remaining validated proxies as failed (they'll be skipped by rotation)
         validated = self._batch_validated.get(batch_index, [])
         failed_set = self._batch_failed_proxies.get(batch_index, set())
+        successful = self._batch_successful_proxies.get(batch_index, [])
+        
         for proxy in validated:
             if proxy not in successful:
                 failed_set.add(proxy)
         self._batch_failed_proxies[batch_index] = failed_set
         
-        # Mark batch as exhausted and move on
-        self._batch_states[batch_index] = "exhausted"
-        self._consumed_batches = max(self._consumed_batches, batch_index + 1)
-        self._save_progress()
-        self._update_proxies_file(batch_index)
-        self._current_batch_index += 1
-        # Reset 429 counter for new batch
-        self._batch_429_count = {}
-        logger.info("Batch %d rate-limited; skipping to next batch", batch_index + 1)
+        logger.debug("Batch %d: marked %d remaining proxies as failed (will be skipped)", 
+                    batch_index + 1, len(failed_set))
 
     def _mark_proxy_successful(self, proxy_dict: dict[str, str] | None) -> None:
         """Mark a proxy as successful (got 200) in the current batch or rest pool."""
