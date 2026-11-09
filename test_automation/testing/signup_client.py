@@ -604,60 +604,41 @@ proxy_check_url: str = "https://api.ipify.org",
         logger.info("Batch %d rate-limited; skipping to next batch", batch_index + 1)
 
     def _mark_proxy_successful(self, proxy_dict: dict[str, str] | None) -> None:
-        """Mark a proxy as successful (got 200) in the current batch."""
-        if proxy_dict:
-            proxy_url = proxy_dict.get("http")
-            if proxy_url:
-                batch_idx = self._current_batch_index
-                if batch_idx < len(self._all_batches):
-                    if proxy_url not in self._batch_successful_proxies[batch_idx]:
-                        self._batch_successful_proxies[batch_idx].append(proxy_url)
-                        logger.debug("Marked proxy as successful in batch %d: %s", batch_idx + 1, proxy_url)
-
-    def _mark_proxy_failed(self, proxy_dict: dict[str, str] | None) -> None:
-        """Mark a proxy as failed in the current batch."""
+        """Mark a proxy as successful (got 200) in the current batch or rest pool."""
         if proxy_dict:
             proxy_url = proxy_dict.get("http")
             if proxy_url:
                 if self._main_batches_exhausted:
-                    # In rest pool - track globally
-                    if not hasattr(self, '_failed_proxies_global'):
-                        self._failed_proxies_global = set()
-                    self._failed_proxies_global.add(proxy_url)
+                    # Using rest pool - track successes globally
+                    if not hasattr(self, '_successful_proxies_global'):
+                        self._successful_proxies_global = set()
+                    self._successful_proxies_global.add(proxy_url)
+                    logger.debug("Marked rest pool proxy as successful: %s", proxy_url)
                 else:
-                    # In main batch
+                    # Using main batch
                     batch_idx = self._current_batch_index
-                    self._batch_failed_proxies[batch_idx].add(proxy_url)
-                logger.debug("Marked proxy as failed: %s", proxy_url)
-        """Mark a batch as exhausted. Move ONLY successful proxies to rest pool."""
-        self._batch_states[batch_index] = "exhausted"
-        
-        # Only successful proxies (got 200) go to rest pool
-        successful = self._batch_successful_proxies.get(batch_index, [])
-        if successful:
-            rest_until = time.time() + self._rest_duration_seconds
-            for proxy in successful:
-                self._rest_pool.append((proxy, rest_until))
-            logger.info("Batch %d exhausted: %d successful proxies moved to rest pool (cooldown %.0fs)", 
-                       batch_index + 1, len(successful), self._rest_duration_seconds)
-        else:
-            logger.info("Batch %d exhausted: no successful proxies to rest", batch_index + 1)
-        
-        # Discard failed proxies permanently
-        failed_count = len(self._batch_failed_proxies.get(batch_index, set()))
-        if failed_count:
-            logger.debug("Batch %d: %d failed proxies discarded", batch_index + 1, failed_count)
-        
-        self._current_batch_index += 1
+                    if batch_idx < len(self._all_batches):
+                        if proxy_url not in self._batch_successful_proxies[batch_idx]:
+                            self._batch_successful_proxies[batch_idx].append(proxy_url)
+                            logger.debug("Marked proxy as successful in batch %d: %s", batch_idx + 1, proxy_url)
 
     def _mark_proxy_failed(self, proxy_dict: dict[str, str] | None) -> None:
-        """Mark a proxy as failed in the current batch."""
+        """Mark a proxy as failed in the current batch or rest pool."""
         if proxy_dict:
             proxy_url = proxy_dict.get("http")
             if proxy_url:
-                batch_idx = self._current_batch_index
-                self._batch_failed_proxies[batch_idx].add(proxy_url)
-                logger.debug("Marked proxy as failed in batch %d: %s", batch_idx + 1, proxy_url)
+                if self._main_batches_exhausted:
+                    # Using rest pool - track failures globally
+                    if not hasattr(self, '_failed_proxies_global'):
+                        self._failed_proxies_global = set()
+                    self._failed_proxies_global.add(proxy_url)
+                    logger.debug("Marked rest pool proxy as failed: %s", proxy_url)
+                else:
+                    # Using main batch
+                    batch_idx = self._current_batch_index
+                    if batch_idx < len(self._all_batches):
+                        self._batch_failed_proxies[batch_idx].add(proxy_url)
+                        logger.debug("Marked proxy as failed in batch %d: %s", batch_idx + 1, proxy_url)
 
     def preflight(self) -> dict[str, Any]:
         """Check outbound connectivity before sending registrations."""
