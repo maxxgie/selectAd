@@ -67,7 +67,7 @@ class SignupClient:
         default_password: str = "12345678",
         username_length: int = 8,
         proxy_check_timeout: int = 5,
-        proxy_check_url: str = "https://api.ipify.org",
+proxy_check_url: str = "https://api.ipify.org",
         max_workers_proxy_check: int = 20,
         auto_validate_proxies: bool = True,
         persist_valid_proxies: bool = True,
@@ -87,23 +87,30 @@ class SignupClient:
         self.db_path = db_path
         self._vpn_state_path = Path(self.db_path).parent / ".vpn_state.json"
         
-        # Store ALL original proxies (1126) - don't filter yet
+        # Progress tracking file - stores which batch index we've processed up to
+        self._progress_file = Path(self.db_path).parent / ".proxy_progress.json"
+        
+        # Load original proxies and progress
         self._all_proxies = proxies or []
+        self._original_proxies = list(self._all_proxies)  # Keep full list for reload
+        
+        # Load progress (which batches have been consumed)
+        self._consumed_batches = self._load_progress()
+        self._current_batch_index = self._consumed_batches
         
         # Batch configuration - split all proxies into batches of 10
         self._proxy_batch_size = 10
         self._all_batches: list[list[str]] = []
-        self._current_batch_index = 0
-        
-        # Track batch states: 'available', 'in_use', 'resting', 'exhausted'
         self._batch_states: list[str] = []
-        self._batch_proxy_index: dict[int, int] = {}  # batch_index -> proxy_index
-        self._batch_validated: dict[int, list[str]] = {}  # batch_index -> validated proxies
-        self._batch_failed_proxies: dict[int, set[str]] = {}  # batch_index -> failed proxies
+        self._batch_proxy_index: dict[int, int] = {}
+        self._batch_validated: dict[int, list[str]] = {}
+        self._batch_failed_proxies: dict[int, set[str]] = {}
+        self._batch_successful_proxies: dict[int, list[str]] = {}
         
-        # Rest pool: batches that have been used and are cooling down
-        self._rest_pool: deque[tuple[int, float]] = deque()  # (batch_index, rest_until_timestamp)
-        self._rest_duration_seconds = 300  # 5 minutes cooldown
+        # Rest pool: SUCCESSFUL proxies from exhausted batches
+        self._rest_pool: list[tuple[str, float]] = []
+        self._rest_duration_seconds = 300
+        self._main_batches_exhausted = False
         
         self.verify_ssl = verify_ssl
         self.country = country
@@ -142,6 +149,80 @@ class SignupClient:
         # Organize all proxies into batches
         self._organize_all_batches()
 
+    def _load_progress(self) -> int:
+        """Load consumed batch count from progress file."""
+        if self._progress_file.exists():
+            try:
+                content = self._progress_file.read_text(encoding="utf-8-sig")  # Handle BOM
+                data = json.loads(content)
+                consumed = data.get("consumed_batches", 0)
+                logger.info("Loaded progress: %d batches already consumed", consumed)
+                return consumed
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Failed to load progress file: %s", exc)
+        return 0
+
+    def _save_progress(self) -> None:
+        """Save consumed batch count to progress file."""
+        try:
+            data = {"consumed_batches": self._consumed_batches}
+            self._progress_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to save progress file: %s", exc)
+
+    def _update_proxies_file(self, batch_index: int) -> None:
+        """Remove consumed batch proxies from the main proxies file."""
+        if not self._proxies_file_path or not self._proxies_file_path.exists():
+            return
+        
+        try:
+            # Read current file
+            with self._proxies_file_path.open("r", encoding="utf-8") as fh:
+                lines = [line.strip() for line in fh if line.strip() and not line.strip().startswith("#")]
+            
+            # Calculate proxies to remove (this batch)
+            start = batch_index * self._proxy_batch_size
+            end = min(start + self._proxy_batch_size, len(self._original_proxies))
+            proxies_to_remove = set(self._original_proxies[start:end])
+            
+            # Write remaining proxies
+            remaining = [p for p in lines if p not in proxies_to_remove]
+            with self._proxies_file_path.open("w", encoding="utf-8") as fh:
+                for proxy in remaining:
+                    fh.write(proxy + "\n")
+            
+            logger.info("Updated proxies file: removed batch %d (%d proxies), %d remaining", 
+                        batch_index + 1, len(proxies_to_remove), len(remaining))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to update proxies file: %s", exc)
+
+    def _reload_all_proxies(self) -> None:
+        """Reload all proxies from backup/original and reset progress."""
+        # Reload from backup file if exists, otherwise from current file
+        backup_path = self._proxies_file_path.with_suffix(".txt.backup") if self._proxies_file_path else None
+        if backup_path and backup_path.exists():
+            with backup_path.open("r", encoding="utf-8") as fh:
+                self._all_proxies = [line.strip() for line in fh if line.strip() and not line.strip().startswith("#")]
+            logger.info("Reloaded %d proxies from backup", len(self._all_proxies))
+        elif self._proxies_file_path and self._proxies_file_path.exists():
+            with self._proxies_file_path.open("r", encoding="utf-8") as fh:
+                self._all_proxies = [line.strip() for line in fh if line.strip() and not line.strip().startswith("#")]
+            logger.info("Reloaded %d proxies from current file", len(self._all_proxies))
+        else:
+            # Fallback to original
+            self._all_proxies = list(self._original_proxies)
+            logger.info("Reloaded %d proxies from original list", len(self._all_proxies))
+        
+        # Reset progress
+        self._consumed_batches = 0
+        self._current_batch_index = 0
+        self._main_batches_exhausted = False
+        self._rest_pool = []
+        self._save_progress()
+        
+        # Reorganize batches
+        self._organize_all_batches()
+
     def _organize_all_batches(self) -> None:
         """Split ALL proxies into batches of _proxy_batch_size (default 10)."""
         if not self._all_proxies:
@@ -157,16 +238,27 @@ class SignupClient:
         self._batch_proxy_index = {i: 0 for i in range(len(self._all_batches))}
         self._batch_validated = {i: [] for i in range(len(self._all_batches))}
         self._batch_failed_proxies = {i: set() for i in range(len(self._all_batches))}
-        self._current_batch_index = 0
-        logger.info("Organized %d proxies into %d batches of size %d", 
-                   len(self._all_proxies), len(self._all_batches), self._proxy_batch_size)
+        self._batch_successful_proxies = {i: [] for i in range(len(self._all_batches))}
+        
+        # Skip already consumed batches
+        if self._consumed_batches > 0:
+            for i in range(min(self._consumed_batches, len(self._all_batches))):
+                self._batch_states[i] = "exhausted"
+            self._current_batch_index = self._consumed_batches
+            logger.info("Skipping first %d consumed batches; starting at batch %d", 
+                       self._consumed_batches, self._current_batch_index + 1)
+        else:
+            self._current_batch_index = 0
+        
+        self._rest_pool = []
+        self._main_batches_exhausted = False
+        logger.info("Organized %d proxies into %d batches of size %d (%d available)", 
+                   len(self._all_proxies), len(self._all_batches), self._proxy_batch_size,
+                   len(self._all_batches) - self._consumed_batches)
 
     def _get_current_batch(self) -> list[str] | None:
-        """Get the current batch, skipping exhausted/resting ones."""
-        # First, check if any resting batches are ready to be reused
-        self._check_rest_pool()
-        
-        # Find next available batch
+        """Get the current batch, skipping exhausted ones."""
+        # Find next available batch from main list
         while self._current_batch_index < len(self._all_batches):
             state = self._batch_states[self._current_batch_index]
             if state == "available":
@@ -175,26 +267,39 @@ class SignupClient:
                 return self._all_batches[self._current_batch_index]
             self._current_batch_index += 1
         
-        # No available batches - check if any are resting
+        # All main batches exhausted - mark flag and check rest pool
+        if not self._main_batches_exhausted:
+            self._main_batches_exhausted = True
+            logger.info("All %d main batches exhausted; moving to rest pool", len(self._all_batches))
+        
+        # Check rest pool for ready proxies
+        self._check_rest_pool()
+        
+        # If rest pool has ready proxies, create a virtual batch from them
+        ready_proxies = [p for p, rest_until in self._rest_pool if rest_until <= time.time()]
+        if ready_proxies:
+            logger.info("Using %d proxies from rest pool", len(ready_proxies))
+            # Remove used proxies from rest pool
+            self._rest_pool = [(p, t) for p, t in self._rest_pool if t > time.time()]
+            return ready_proxies
+        
+        # No ready proxies in rest pool - wait for next one
         if self._rest_pool:
-            wait_time = self._rest_pool[0][1] - time.time()
+            wait_time = min(t for _, t in self._rest_pool) - time.time()
             if wait_time > 0:
-                logger.info("All batches in use/resting; waiting %.1fs for next batch to be ready", wait_time)
+                logger.info("Waiting %.1fs for next rest pool proxy", wait_time)
                 time.sleep(wait_time)
                 self._check_rest_pool()
                 return self._get_current_batch()
         
-        logger.warning("No batches available")
-        return None
+        # Rest pool also empty - FULLY EXHAUSTED: reload all proxies and start over
+        logger.info("All batches and rest pool exhausted; reloading all proxies and starting fresh")
+        self._reload_all_proxies()
+        return self._get_current_batch()
 
     def _check_rest_pool(self) -> None:
-        """Move batches from rest pool back to available if cooldown complete."""
-        now = time.time()
-        while self._rest_pool and self._rest_pool[0][1] <= now:
-            batch_idx, _ = self._rest_pool.popleft()
-            self._batch_states[batch_idx] = "available"
-            self._batch_failed_proxies[batch_idx].clear()
-            logger.info("Batch %d cooldown complete; moved back to available", batch_idx + 1)
+        """No-op: rest pool is checked lazily in _get_current_batch"""
+        pass
 
     def _validate_batch(self, batch_index: int) -> list[str]:
         """Validate proxies in a batch. Returns list of working proxies."""
@@ -253,18 +358,86 @@ class SignupClient:
             attempts += 1
         
         # All proxies in this batch failed - mark batch exhausted
-        logger.info("Batch %d exhausted (all %d proxies failed); moving to rest pool", 
+        logger.info("Batch %d exhausted (all %d proxies failed); marking exhausted", 
                    batch_idx + 1, len(validated))
         self._mark_batch_exhausted(batch_idx)
         return self._get_next_proxy()
 
     def _mark_batch_exhausted(self, batch_index: int) -> None:
-        """Mark a batch as exhausted and move to rest pool."""
+        """Mark a batch as exhausted. Move ONLY successful proxies to rest pool. Update progress."""
         self._batch_states[batch_index] = "exhausted"
-        rest_until = time.time() + self._rest_duration_seconds
-        self._rest_pool.append((batch_index, rest_until))
+        
+        # Only successful proxies (got 200) go to rest pool
+        successful = self._batch_successful_proxies.get(batch_index, [])
+        if successful:
+            rest_until = time.time() + self._rest_duration_seconds
+            for proxy in successful:
+                self._rest_pool.append((proxy, rest_until))
+            logger.info("Batch %d exhausted: %d successful proxies moved to rest pool (cooldown %.0fs)", 
+                       batch_index + 1, len(successful), self._rest_duration_seconds)
+        else:
+            logger.info("Batch %d exhausted: no successful proxies to rest", batch_index + 1)
+        
+        # Discard failed proxies permanently
+        failed_count = len(self._batch_failed_proxies.get(batch_index, set()))
+        if failed_count:
+            logger.debug("Batch %d: %d failed proxies discarded", batch_index + 1, failed_count)
+        
+        # Update progress: this batch is now consumed
+        self._consumed_batches = max(self._consumed_batches, batch_index + 1)
+        self._save_progress()
+        
+        # Remove consumed batch from proxies file
+        self._update_proxies_file(batch_index)
+        
         self._current_batch_index += 1
-        logger.info("Batch %d moved to rest pool for %.0fs", batch_index + 1, self._rest_duration_seconds)
+
+    def _mark_proxy_successful(self, proxy_dict: dict[str, str] | None) -> None:
+        """Mark a proxy as successful (got 200) in the current batch."""
+        if proxy_dict:
+            proxy_url = proxy_dict.get("http")
+            if proxy_url:
+                batch_idx = self._current_batch_index
+                if batch_idx < len(self._all_batches):
+                    if proxy_url not in self._batch_successful_proxies[batch_idx]:
+                        self._batch_successful_proxies[batch_idx].append(proxy_url)
+                        logger.debug("Marked proxy as successful in batch %d: %s", batch_idx + 1, proxy_url)
+
+    def _mark_proxy_failed(self, proxy_dict: dict[str, str] | None) -> None:
+        """Mark a proxy as failed in the current batch."""
+        if proxy_dict:
+            proxy_url = proxy_dict.get("http")
+            if proxy_url:
+                if self._main_batches_exhausted:
+                    # In rest pool - track globally
+                    if not hasattr(self, '_failed_proxies_global'):
+                        self._failed_proxies_global = set()
+                    self._failed_proxies_global.add(proxy_url)
+                else:
+                    # In main batch
+                    batch_idx = self._current_batch_index
+                    self._batch_failed_proxies[batch_idx].add(proxy_url)
+                logger.debug("Marked proxy as failed: %s", proxy_url)
+        """Mark a batch as exhausted. Move ONLY successful proxies to rest pool."""
+        self._batch_states[batch_index] = "exhausted"
+        
+        # Only successful proxies (got 200) go to rest pool
+        successful = self._batch_successful_proxies.get(batch_index, [])
+        if successful:
+            rest_until = time.time() + self._rest_duration_seconds
+            for proxy in successful:
+                self._rest_pool.append((proxy, rest_until))
+            logger.info("Batch %d exhausted: %d successful proxies moved to rest pool (cooldown %.0fs)", 
+                       batch_index + 1, len(successful), self._rest_duration_seconds)
+        else:
+            logger.info("Batch %d exhausted: no successful proxies to rest", batch_index + 1)
+        
+        # Discard failed proxies permanently
+        failed_count = len(self._batch_failed_proxies.get(batch_index, set()))
+        if failed_count:
+            logger.debug("Batch %d: %d failed proxies discarded", batch_index + 1, failed_count)
+        
+        self._current_batch_index += 1
 
     def _mark_proxy_failed(self, proxy_dict: dict[str, str] | None) -> None:
         """Mark a proxy as failed in the current batch."""
@@ -454,6 +627,8 @@ class SignupClient:
 
                 if 200 <= status_code < 300:
                     logger.info("Signup succeeded for %s (status %s)", current_user.username, status_code)
+                    # Mark proxy as successful for rest pool
+                    self._mark_proxy_successful(current_proxy)
                     try:
                         with SQLiteManager(self.db_path) as db:
                             db.delete_user(current_user.username)

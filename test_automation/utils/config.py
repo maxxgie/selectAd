@@ -57,6 +57,7 @@ class Config:
     preflight_before_submit: bool = True
     username_length: int = 8
     proxies: list[str] | None = None
+    proxies_path: str | None = None
     verify_ssl: bool = True
     proxy_check_timeout: int = 5
     proxy_check_url: str = "https://api.ipify.org"
@@ -176,6 +177,7 @@ def load_config(config_path: str | Path | None = None) -> Config:
         ),
         username_length=int(os.environ.get("USERNAME_LENGTH", data.get("username_length", 8))),
         person_config_path=data.get("person_config_path", "config/person.json"),
+        proxies_path=data.get("proxies_path"),
         proxies=proxies,
         verify_ssl=data.get("verify_ssl", True),
         proxy_check_timeout=data.get("proxy_check_timeout", 5),
