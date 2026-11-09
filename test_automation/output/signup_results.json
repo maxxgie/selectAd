@@ -1,180 +1,94 @@
 {
   "summary": {
-    "total": 10,
-    "successful": 10,
-    "failed": 0,
+    "total": 5,
+    "successful": 3,
+    "failed": 2,
     "successful_users": [
-      "wlwj8axu",
-      "cwrkkhe3",
-      "ukfqlyu9",
-      "elix1dn0",
-      "9ivkq6dl",
-      "s5qiqgg2",
-      "kgh1rm7w",
-      "bfmwaz13",
-      "gw0pwapv",
-      "pqdrus4n"
+      "7h4avyi0",
+      "pl9g4cly",
+      "fcsd9omb"
     ],
-    "failed_users": [],
-    "errors": []
+    "failed_users": [
+      "sx6fknnu",
+      "bdo86dz1"
+    ],
+    "errors": [
+      "SOCKSHTTPSConnectionPool(host='adselect.net', port=443): Max retries exceeded with url: /api/auth/register (Caused by ConnectTimeoutError(<SOCKSHTTPSConnection(host='adselect.net', port=443) at 0x20e75a97d90>, 'Connection to adselect.net timed out. (connect timeout=10)'))",
+      "SOCKSHTTPSConnectionPool(host='adselect.net', port=443): Read timed out. (read timeout=10)"
+    ]
   },
   "preflight": {
     "api_reachable": true,
-    "public_ip": "169.150.196.144",
+    "public_ip": "89.238.156.244",
     "api_status": 200,
-    "vpn_ip_changed": false,
+    "vpn_ip_changed": true,
     "proxies_validated": 4,
-    "total_batches": 110,
+    "total_batches": 101,
     "proxies_in_first_batch": 10
   },
   "results": [
     {
-      "username": "wlwj8axu",
-      "email": "qje5zmhl@gmail.com",
-      "phone": "5171625355",
+      "username": "sx6fknnu",
+      "email": "ye1bbq6n@gmail.com",
+      "phone": "8622898333",
+      "country": "United States",
+      "success": false,
+      "status_code": null,
+      "response": null,
+      "error_message": "SOCKSHTTPSConnectionPool(host='adselect.net', port=443): Max retries exceeded with url: /api/auth/register (Caused by ConnectTimeoutError(<SOCKSHTTPSConnection(host='adselect.net', port=443) at 0x20e75a97d90>, 'Connection to adselect.net timed out. (connect timeout=10)'))"
+    },
+    {
+      "username": "bdo86dz1",
+      "email": "ie0y4129@gmail.com",
+      "phone": "5676653540",
+      "country": "United States",
+      "success": false,
+      "status_code": null,
+      "response": null,
+      "error_message": "SOCKSHTTPSConnectionPool(host='adselect.net', port=443): Read timed out. (read timeout=10)"
+    },
+    {
+      "username": "7h4avyi0",
+      "email": "70ah15kn@gmail.com",
+      "phone": "3952354174",
       "country": "United States",
       "success": true,
       "status_code": 200,
       "response": {
         "success": true,
-        "userid": "ASD8439195",
-        "username": "wlwj8axu",
-        "metaEventId": "reg.ASD8439195.1794222122465.dfa97052"
+        "userid": "ASD5301643",
+        "username": "7h4avyi0",
+        "metaEventId": "reg.ASD5301643.1794230454811.ca47f6c1"
       },
       "error_message": null
     },
     {
-      "username": "cwrkkhe3",
-      "email": "wajen5ge@gmail.com",
-      "phone": "1363629456",
+      "username": "pl9g4cly",
+      "email": "7ucsc7mt@gmail.com",
+      "phone": "0203125700",
       "country": "United States",
       "success": true,
       "status_code": 200,
       "response": {
         "success": true,
-        "userid": "ASD8813088",
-        "username": "cwrkkhe3",
-        "metaEventId": "reg.ASD8813088.1794222124614.5a1872ab"
+        "userid": "ASD3777243",
+        "username": "pl9g4cly",
+        "metaEventId": "reg.ASD3777243.1794230456957.78505d22"
       },
       "error_message": null
     },
     {
-      "username": "ukfqlyu9",
-      "email": "nszk0ji4@gmail.com",
-      "phone": "3845747773",
+      "username": "fcsd9omb",
+      "email": "bvhq0cry@gmail.com",
+      "phone": "8982577869",
       "country": "United States",
       "success": true,
       "status_code": 200,
       "response": {
         "success": true,
-        "userid": "ASD8648685",
-        "username": "ukfqlyu9",
-        "metaEventId": "reg.ASD8648685.1794222126678.254e7e97"
-      },
-      "error_message": null
-    },
-    {
-      "username": "elix1dn0",
-      "email": "0fisrui3@gmail.com",
-      "phone": "8896815753",
-      "country": "United States",
-      "success": true,
-      "status_code": 200,
-      "response": {
-        "success": true,
-        "userid": "ASD8591858",
-        "username": "elix1dn0",
-        "metaEventId": "reg.ASD8591858.1794222136650.2d0fda55"
-      },
-      "error_message": null
-    },
-    {
-      "username": "9ivkq6dl",
-      "email": "28a8bepz@gmail.com",
-      "phone": "5853555599",
-      "country": "United States",
-      "success": true,
-      "status_code": 200,
-      "response": {
-        "success": true,
-        "userid": "ASD8703451",
-        "username": "9ivkq6dl",
-        "metaEventId": "reg.ASD8703451.1794222144779.0a677303"
-      },
-      "error_message": null
-    },
-    {
-      "username": "s5qiqgg2",
-      "email": "3ms3f555@gmail.com",
-      "phone": "8503949717",
-      "country": "United States",
-      "success": true,
-      "status_code": 200,
-      "response": {
-        "success": true,
-        "userid": "ASD2469958",
-        "username": "s5qiqgg2",
-        "metaEventId": "reg.ASD2469958.1794222146541.49a2e7cd"
-      },
-      "error_message": null
-    },
-    {
-      "username": "kgh1rm7w",
-      "email": "d84v3reh@gmail.com",
-      "phone": "6027086876",
-      "country": "United States",
-      "success": true,
-      "status_code": 200,
-      "response": {
-        "success": true,
-        "userid": "ASD5728088",
-        "username": "kgh1rm7w",
-        "metaEventId": "reg.ASD5728088.1794222149418.2232aa8a"
-      },
-      "error_message": null
-    },
-    {
-      "username": "bfmwaz13",
-      "email": "0fjcedd2@gmail.com",
-      "phone": "4984110754",
-      "country": "United States",
-      "success": true,
-      "status_code": 200,
-      "response": {
-        "success": true,
-        "userid": "ASD9176291",
-        "username": "bfmwaz13",
-        "metaEventId": "reg.ASD9176291.1794222157178.f78d099e"
-      },
-      "error_message": null
-    },
-    {
-      "username": "gw0pwapv",
-      "email": "5cp5i1n7@gmail.com",
-      "phone": "6569058972",
-      "country": "United States",
-      "success": true,
-      "status_code": 200,
-      "response": {
-        "success": true,
-        "userid": "ASD1401013",
-        "username": "gw0pwapv",
-        "metaEventId": "reg.ASD1401013.1794222158879.39ec0fc6"
-      },
-      "error_message": null
-    },
-    {
-      "username": "pqdrus4n",
-      "email": "erzl7gv3@gmail.com",
-      "phone": "9827514059",
-      "country": "United States",
-      "success": true,
-      "status_code": 200,
-      "response": {
-        "success": true,
-        "userid": "ASD6361710",
-        "username": "pqdrus4n",
-        "metaEventId": "reg.ASD6361710.1794222165146.68133cd3"
+        "userid": "ASD5662228",
+        "username": "fcsd9omb",
+        "metaEventId": "reg.ASD5662228.1794230465927.e2af0077"
       },
       "error_message": null
     }
