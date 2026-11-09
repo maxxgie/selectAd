@@ -1,100 +1,258 @@
 {
   "summary": {
-    "total": 5,
-    "successful": 5,
-    "failed": 0,
+    "total": 15,
+    "successful": 13,
+    "failed": 2,
     "successful_users": [
-      "vsp9ddzd",
-      "8ud9nhk8",
-      "uzn6z2bf",
-      "gbzlj6ge",
-      "o3w95ptd"
+      "xqex9ssg",
+      "0sgihjko",
+      "dkzweqx3",
+      "z72ggqds",
+      "0pm7bbtl",
+      "b9qalqrt",
+      "n3snmruy",
+      "bjkcf1e7",
+      "o6ygv56f",
+      "itwexf74",
+      "um9xhvrg",
+      "dt09jkk1",
+      "kc03yjq2"
     ],
-    "failed_users": [],
-    "errors": []
+    "failed_users": [
+      "ywhdm9n0",
+      "ma2dqwkk"
+    ],
+    "errors": [
+      "{'error': 'Email or phone already registered'}",
+      "{'error': 'This username is already taken. Please choose another.'}"
+    ]
   },
   "preflight": {
     "api_reachable": true,
     "public_ip": "80.240.202.18",
     "api_status": 200,
     "vpn_ip_changed": false,
-    "proxies_validated": 1,
-    "total_batches": 17,
+    "proxies_validated": 2,
+    "total_batches": 9,
     "proxies_in_first_batch": 10
   },
   "results": [
     {
-      "username": "vsp9ddzd",
-      "email": "p2wat5su@gmail.com",
-      "phone": "7255675065",
+      "username": "xqex9ssg",
+      "email": "2brdysb9@gmail.com",
+      "phone": "3525085527",
       "country": "United States",
       "success": true,
       "status_code": 200,
       "response": {
         "success": true,
-        "userid": "ASD4345159",
-        "username": "vsp9ddzd",
-        "metaEventId": "reg.ASD4345159.1794235341562.d30851cf"
+        "userid": "ASD6614751",
+        "username": "xqex9ssg",
+        "metaEventId": "reg.ASD6614751.1794238466663.a2b0eb3f"
       },
       "error_message": null
     },
     {
-      "username": "8ud9nhk8",
-      "email": "40dk06h2@gmail.com",
-      "phone": "9590020560",
+      "username": "ywhdm9n0",
+      "email": "90fq8vve@gmail.com",
+      "phone": "4282247432",
+      "country": "United States",
+      "success": false,
+      "status_code": 400,
+      "response": {
+        "error": "Email or phone already registered"
+      },
+      "error_message": "{'error': 'Email or phone already registered'}"
+    },
+    {
+      "username": "ma2dqwkk",
+      "email": "nbbz7luo@gmail.com",
+      "phone": "3853888238",
+      "country": "United States",
+      "success": false,
+      "status_code": 400,
+      "response": {
+        "error": "This username is already taken. Please choose another."
+      },
+      "error_message": "{'error': 'This username is already taken. Please choose another.'}"
+    },
+    {
+      "username": "0sgihjko",
+      "email": "la0dj7mx@gmail.com",
+      "phone": "6631956045",
       "country": "United States",
       "success": true,
       "status_code": 200,
       "response": {
         "success": true,
-        "userid": "ASD2735637",
-        "username": "8ud9nhk8",
-        "metaEventId": "reg.ASD2735637.1794235351819.5d7cfd0b"
+        "userid": "ASD9986772",
+        "username": "0sgihjko",
+        "metaEventId": "reg.ASD9986772.1794238534120.9cabe071"
       },
       "error_message": null
     },
     {
-      "username": "uzn6z2bf",
-      "email": "ieeewz2b@gmail.com",
-      "phone": "3203619773",
+      "username": "dkzweqx3",
+      "email": "0nhao5e1@gmail.com",
+      "phone": "8366194841",
       "country": "United States",
       "success": true,
       "status_code": 200,
       "response": {
         "success": true,
-        "userid": "ASD2278457",
-        "username": "uzn6z2bf",
-        "metaEventId": "reg.ASD2278457.1794235353452.8e45b858"
+        "userid": "ASD2732251",
+        "username": "dkzweqx3",
+        "metaEventId": "reg.ASD2732251.1794238536726.2be56582"
       },
       "error_message": null
     },
     {
-      "username": "gbzlj6ge",
-      "email": "qy92lw4w@gmail.com",
-      "phone": "7612182039",
+      "username": "z72ggqds",
+      "email": "ism6nrjn@gmail.com",
+      "phone": "6959882572",
       "country": "United States",
       "success": true,
       "status_code": 200,
       "response": {
         "success": true,
-        "userid": "ASD7482915",
-        "username": "gbzlj6ge",
-        "metaEventId": "reg.ASD7482915.1794235355500.d72eb93d"
+        "userid": "ASD7931663",
+        "username": "z72ggqds",
+        "metaEventId": "reg.ASD7931663.1794238546749.13de4f46"
       },
       "error_message": null
     },
     {
-      "username": "o3w95ptd",
-      "email": "ikxb3v30@gmail.com",
-      "phone": "4714072121",
+      "username": "0pm7bbtl",
+      "email": "jmrffxe5@gmail.com",
+      "phone": "3946606135",
       "country": "United States",
       "success": true,
       "status_code": 200,
       "response": {
         "success": true,
-        "userid": "ASD9083520",
-        "username": "o3w95ptd",
-        "metaEventId": "reg.ASD9083520.1794235358211.ac0c6981"
+        "userid": "ASD4924627",
+        "username": "0pm7bbtl",
+        "metaEventId": "reg.ASD4924627.1794238567042.c4d0ed65"
+      },
+      "error_message": null
+    },
+    {
+      "username": "b9qalqrt",
+      "email": "4tpvxw1t@gmail.com",
+      "phone": "2271084109",
+      "country": "United States",
+      "success": true,
+      "status_code": 200,
+      "response": {
+        "success": true,
+        "userid": "ASD4202273",
+        "username": "b9qalqrt",
+        "metaEventId": "reg.ASD4202273.1794238569541.fa55f35b"
+      },
+      "error_message": null
+    },
+    {
+      "username": "n3snmruy",
+      "email": "1w6spre4@gmail.com",
+      "phone": "0643432011",
+      "country": "United States",
+      "success": true,
+      "status_code": 200,
+      "response": {
+        "success": true,
+        "userid": "ASD9472610",
+        "username": "n3snmruy",
+        "metaEventId": "reg.ASD9472610.1794238571579.4f3cdaba"
+      },
+      "error_message": null
+    },
+    {
+      "username": "bjkcf1e7",
+      "email": "g04zebbc@gmail.com",
+      "phone": "9024467451",
+      "country": "United States",
+      "success": true,
+      "status_code": 200,
+      "response": {
+        "success": true,
+        "userid": "ASD4737643",
+        "username": "bjkcf1e7",
+        "metaEventId": "reg.ASD4737643.1794238574184.e84e358b"
+      },
+      "error_message": null
+    },
+    {
+      "username": "o6ygv56f",
+      "email": "2gqwrwmb@gmail.com",
+      "phone": "1520197619",
+      "country": "United States",
+      "success": true,
+      "status_code": 200,
+      "response": {
+        "success": true,
+        "userid": "ASD7905295",
+        "username": "o6ygv56f",
+        "metaEventId": "reg.ASD7905295.1794238576324.f59a1449"
+      },
+      "error_message": null
+    },
+    {
+      "username": "itwexf74",
+      "email": "uus6clh7@gmail.com",
+      "phone": "6830036647",
+      "country": "United States",
+      "success": true,
+      "status_code": 200,
+      "response": {
+        "success": true,
+        "userid": "ASD6170384",
+        "username": "itwexf74",
+        "metaEventId": "reg.ASD6170384.1794238578917.b2864279"
+      },
+      "error_message": null
+    },
+    {
+      "username": "um9xhvrg",
+      "email": "mu2ilmmh@gmail.com",
+      "phone": "4125768358",
+      "country": "United States",
+      "success": true,
+      "status_code": 200,
+      "response": {
+        "success": true,
+        "userid": "ASD3416586",
+        "username": "um9xhvrg",
+        "metaEventId": "reg.ASD3416586.1794238581232.c6284a57"
+      },
+      "error_message": null
+    },
+    {
+      "username": "dt09jkk1",
+      "email": "j77dg66k@gmail.com",
+      "phone": "4706062913",
+      "country": "United States",
+      "success": true,
+      "status_code": 200,
+      "response": {
+        "success": true,
+        "userid": "ASD4742089",
+        "username": "dt09jkk1",
+        "metaEventId": "reg.ASD4742089.1794238583340.19d7cb79"
+      },
+      "error_message": null
+    },
+    {
+      "username": "kc03yjq2",
+      "email": "n32hwvd5@gmail.com",
+      "phone": "4018389692",
+      "country": "United States",
+      "success": true,
+      "status_code": 200,
+      "response": {
+        "success": true,
+        "userid": "ASD7764535",
+        "username": "kc03yjq2",
+        "metaEventId": "reg.ASD7764535.1794238586173.3a477857"
       },
       "error_message": null
     }

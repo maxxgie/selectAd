@@ -151,17 +151,17 @@ proxy_check_url: str = "https://api.ipify.org",
         self._organize_all_batches()
 
     def _ensure_backup_file(self) -> None:
-        """Ensure backup file exists for the main proxies file."""
+        """Ensure backup file exists and is empty on startup."""
         if not self._proxies_file_path:
             return
         backup_path = self._proxies_file_path.with_suffix(".txt.backup")
-        if self._proxies_file_path.exists() and not backup_path.exists():
-            try:
-                import shutil
-                shutil.copy2(self._proxies_file_path, backup_path)
-                logger.info("Created backup file: %s", backup_path)
-            except Exception as exc:  # noqa: BLE001
-                logger.warning("Failed to create backup file: %s", exc)
+        try:
+            # Create empty backup file on startup
+            with backup_path.open("w", encoding="utf-8") as fh:
+                pass  # Truncate to empty
+            logger.info("Initialized empty backup file: %s", backup_path)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to initialize backup file: %s", exc)
 
     def _load_progress(self) -> int:
         """Load consumed batch count from progress file."""
@@ -180,12 +180,12 @@ proxy_check_url: str = "https://api.ipify.org",
         """Save consumed batch count to progress file."""
         try:
             data = {"consumed_batches": self._consumed_batches}
-            self._progress_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
+            self._progress_file.write_text(json.dumps(data, indent=2), encoding="utf-8-sig")
         except Exception as exc:  # noqa: BLE001
             logger.warning("Failed to save progress file: %s", exc)
 
     def _update_proxies_file(self, batch_index: int) -> None:
-        """Remove consumed batch proxies from main file. Save successful proxies to working file."""
+        """Remove consumed batch proxies from main file. Write consumed proxies to backup file."""
         if not self._proxies_file_path or not self._proxies_file_path.exists():
             return
         
@@ -196,18 +196,21 @@ proxy_check_url: str = "https://api.ipify.org",
             
             # Get proxies to remove from the current batch
             if batch_index < len(self._all_batches):
-                proxies_to_remove = set(self._all_batches[batch_index])
+                proxies_to_remove = list(self._all_batches[batch_index])
             else:
-                proxies_to_remove = set()
+                proxies_to_remove = []
             
             # Write remaining proxies to main file
-            remaining = [p for p in lines if p not in proxies_to_remove]
+            remaining = [p for p in lines if p not in set(proxies_to_remove)]
             with self._proxies_file_path.open("w", encoding="utf-8") as fh:
                 for proxy in remaining:
                     fh.write(proxy + "\n")
             
             logger.info("Updated proxies file: removed batch %d (%d proxies), %d remaining", 
                         batch_index + 1, len(proxies_to_remove), len(remaining))
+            
+            # Write consumed proxies to backup file
+            self._append_to_backup(proxies_to_remove)
             
             # Save successful proxies to working file
             self._save_working_proxies(batch_index)
@@ -217,6 +220,29 @@ proxy_check_url: str = "https://api.ipify.org",
                 self._reload_main_from_backup()
         except Exception as exc:  # noqa: BLE001
             logger.warning("Failed to update proxies file: %s", exc)
+
+    def _append_to_backup(self, proxies: list[str]) -> None:
+        """Append consumed proxies to the backup file (no duplicates)."""
+        if not self._proxies_file_path or not proxies:
+            return
+        backup_path = self._proxies_file_path.with_suffix(".txt.backup")
+        try:
+            # Read existing backup to check for duplicates
+            existing = []
+            if backup_path.exists():
+                with backup_path.open("r", encoding="utf-8") as fh:
+                    existing = [line.strip() for line in fh if line.strip() and not line.strip().startswith("#")]
+            
+            existing_set = set(existing)
+            new_proxies = [p for p in proxies if p not in existing_set]
+            
+            if new_proxies:
+                with backup_path.open("a", encoding="utf-8") as fh:
+                    for proxy in new_proxies:
+                        fh.write(proxy + "\n")
+                logger.debug("Appended %d new consumed proxies to backup file", len(new_proxies))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to append to backup file: %s", exc)
 
     def _save_working_proxies(self, batch_index: int) -> None:
         """Save successful proxies from a batch to the working proxies file."""
@@ -253,20 +279,39 @@ proxy_check_url: str = "https://api.ipify.org",
             logger.warning("Failed to save working proxies: %s", exc)
 
     def _reload_main_from_backup(self) -> None:
-        """Reload main proxies file from backup when it's empty."""
+        """Reload main proxies file from backup when it's empty. Then clear backup."""
         if not self._proxies_file_path:
             return
         
         backup_path = self._proxies_file_path.with_suffix(".txt.backup")
         if backup_path and backup_path.exists():
             try:
-                import shutil
-                shutil.copy2(backup_path, self._proxies_file_path)
-                logger.info("Reloaded main proxies file from backup (%s)", backup_path)
+                # Read backup, deduplicate
+                with backup_path.open("r", encoding="utf-8") as fh:
+                    backup_lines = [line.strip() for line in fh if line.strip() and not line.strip().startswith("#")]
+                
+                # Deduplicate while preserving order
+                seen = set()
+                unique_proxies = []
+                for p in backup_lines:
+                    if p not in seen:
+                        seen.add(p)
+                        unique_proxies.append(p)
+                
+                # Write deduplicated proxies to main file
+                with self._proxies_file_path.open("w", encoding="utf-8") as fh:
+                    for proxy in unique_proxies:
+                        fh.write(proxy + "\n")
+                
+                # Clear backup file after successful reload
+                with backup_path.open("w", encoding="utf-8") as fh:
+                    pass  # Truncate to empty
+                
+                logger.info("Reloaded main proxies file from backup: %d unique proxies (was %d lines); backup cleared", 
+                           len(unique_proxies), len(backup_lines))
                 
                 # Reload proxies from the restored file
-                with self._proxies_file_path.open("r", encoding="utf-8") as fh:
-                    self._all_proxies = [line.strip() for line in fh if line.strip() and not line.strip().startswith("#")]
+                self._all_proxies = list(unique_proxies)
                 self._original_proxies = list(self._all_proxies)
                 
                 # Reset progress and reorganize
@@ -282,24 +327,41 @@ proxy_check_url: str = "https://api.ipify.org",
         """Reload all proxies from backup/original and reset progress. Restore main file from backup."""
         backup_path = self._proxies_file_path.with_suffix(".txt.backup") if self._proxies_file_path else None
         
-        # Restore main file from backup
-        if backup_path and backup_path.exists() and self._proxies_file_path:
+        # Use the same deduplication logic as _reload_main_from_backup
+        if backup_path and backup_path.exists():
             try:
-                import shutil
-                shutil.copy2(backup_path, self._proxies_file_path)
-                logger.info("Restored proxies file from backup: %s", backup_path)
+                # Read backup, deduplicate
+                with backup_path.open("r", encoding="utf-8") as fh:
+                    backup_lines = [line.strip() for line in fh if line.strip() and not line.strip().startswith("#")]
+                
+                seen = set()
+                unique_proxies = []
+                for p in backup_lines:
+                    if p not in seen:
+                        seen.add(p)
+                        unique_proxies.append(p)
+                
+                # Write deduplicated proxies to main file
+                if self._proxies_file_path:
+                    with self._proxies_file_path.open("w", encoding="utf-8") as fh:
+                        for proxy in unique_proxies:
+                            fh.write(proxy + "\n")
+                
+                # Clear backup file after successful reload
+                with backup_path.open("w", encoding="utf-8") as fh:
+                    pass  # Truncate to empty
+                
+                logger.info("Reloaded %d unique proxies from backup (was %d lines); backup cleared", 
+                           len(unique_proxies), len(backup_lines))
+                
+                self._all_proxies = list(unique_proxies)
             except Exception as exc:  # noqa: BLE001
-                logger.warning("Failed to restore proxies file from backup: %s", exc)
-        
-        # Reload proxies from the restored file
-        if self._proxies_file_path and self._proxies_file_path.exists():
+                logger.warning("Failed to reload from backup: %s", exc)
+                self._all_proxies = list(self._original_proxies)
+        elif self._proxies_file_path and self._proxies_file_path.exists():
             with self._proxies_file_path.open("r", encoding="utf-8") as fh:
                 self._all_proxies = [line.strip() for line in fh if line.strip() and not line.strip().startswith("#")]
-            logger.info("Reloaded %d proxies from restored main file", len(self._all_proxies))
-        elif backup_path and backup_path.exists():
-            with backup_path.open("r", encoding="utf-8") as fh:
-                self._all_proxies = [line.strip() for line in fh if line.strip() and not line.strip().startswith("#")]
-            logger.info("Reloaded %d proxies from backup", len(self._all_proxies))
+            logger.info("Reloaded %d proxies from main file", len(self._all_proxies))
         else:
             self._all_proxies = list(self._original_proxies)
             logger.info("Reloaded %d proxies from original list", len(self._all_proxies))
@@ -433,12 +495,26 @@ proxy_check_url: str = "https://api.ipify.org",
         return valid
 
     def _get_next_proxy(self) -> dict[str, str] | None:
-        """Get the next working proxy from the current batch."""
-        # Get current batch
+        """Get the next working proxy from the current batch or rest pool."""
+        # Get current batch (main or rest pool)
         batch = self._get_current_batch()
         if not batch:
             return None
         
+        # Check if we're using rest pool (main batches exhausted)
+        using_rest_pool = self._main_batches_exhausted
+        
+        if using_rest_pool:
+            # Rest pool: batch is a list of ready proxies - just use them
+            for proxy in batch:
+                if not hasattr(self, '_failed_proxies_global'):
+                    self._failed_proxies_global = set()
+                if proxy not in self._failed_proxies_global:
+                    return {"http": proxy, "https": proxy}
+            logger.warning("All rest pool proxies failed")
+            return None
+        
+        # Main batch path
         batch_idx = self._current_batch_index
         self._batch_states[batch_idx] = "in_use"
         
