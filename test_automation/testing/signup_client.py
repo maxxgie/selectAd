@@ -111,6 +111,7 @@ proxy_check_url: str = "https://api.ipify.org",
         self._rest_pool: list[tuple[str, float]] = []
         self._rest_duration_seconds = 300
         self._main_batches_exhausted = False
+        self._batch_429_count: dict[int, int] = {}
         
         self.verify_ssl = verify_ssl
         self.country = country
@@ -149,6 +150,19 @@ proxy_check_url: str = "https://api.ipify.org",
         # Organize all proxies into batches
         self._organize_all_batches()
 
+    def _ensure_backup_file(self) -> None:
+        """Ensure backup file exists for the main proxies file."""
+        if not self._proxies_file_path:
+            return
+        backup_path = self._proxies_file_path.with_suffix(".txt.backup")
+        if self._proxies_file_path.exists() and not backup_path.exists():
+            try:
+                import shutil
+                shutil.copy2(self._proxies_file_path, backup_path)
+                logger.info("Created backup file: %s", backup_path)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Failed to create backup file: %s", exc)
+
     def _load_progress(self) -> int:
         """Load consumed batch count from progress file."""
         if self._progress_file.exists():
@@ -171,21 +185,22 @@ proxy_check_url: str = "https://api.ipify.org",
             logger.warning("Failed to save progress file: %s", exc)
 
     def _update_proxies_file(self, batch_index: int) -> None:
-        """Remove consumed batch proxies from the main proxies file."""
+        """Remove consumed batch proxies from main file. Save successful proxies to working file."""
         if not self._proxies_file_path or not self._proxies_file_path.exists():
             return
         
         try:
-            # Read current file
+            # Read current main file
             with self._proxies_file_path.open("r", encoding="utf-8") as fh:
                 lines = [line.strip() for line in fh if line.strip() and not line.strip().startswith("#")]
             
-            # Calculate proxies to remove (this batch)
-            start = batch_index * self._proxy_batch_size
-            end = min(start + self._proxy_batch_size, len(self._original_proxies))
-            proxies_to_remove = set(self._original_proxies[start:end])
+            # Get proxies to remove from the current batch
+            if batch_index < len(self._all_batches):
+                proxies_to_remove = set(self._all_batches[batch_index])
+            else:
+                proxies_to_remove = set()
             
-            # Write remaining proxies
+            # Write remaining proxies to main file
             remaining = [p for p in lines if p not in proxies_to_remove]
             with self._proxies_file_path.open("w", encoding="utf-8") as fh:
                 for proxy in remaining:
@@ -193,31 +208,111 @@ proxy_check_url: str = "https://api.ipify.org",
             
             logger.info("Updated proxies file: removed batch %d (%d proxies), %d remaining", 
                         batch_index + 1, len(proxies_to_remove), len(remaining))
+            
+            # Save successful proxies to working file
+            self._save_working_proxies(batch_index)
+            
+            # If main file is empty, reload from backup
+            if not remaining:
+                self._reload_main_from_backup()
         except Exception as exc:  # noqa: BLE001
             logger.warning("Failed to update proxies file: %s", exc)
 
-    def _reload_all_proxies(self) -> None:
-        """Reload all proxies from backup/original and reset progress."""
-        # Reload from backup file if exists, otherwise from current file
-        backup_path = self._proxies_file_path.with_suffix(".txt.backup") if self._proxies_file_path else None
+    def _save_working_proxies(self, batch_index: int) -> None:
+        """Save successful proxies from a batch to the working proxies file."""
+        if not self._proxies_file_path:
+            return
+        
+        working_path = self._proxies_file_path.with_suffix(".working.txt")
+        successful = self._batch_successful_proxies.get(batch_index, [])
+        if not successful:
+            return
+        
+        try:
+            # Read existing working proxies
+            existing = []
+            if working_path.exists():
+                with working_path.open("r", encoding="utf-8") as fh:
+                    existing = [line.strip() for line in fh if line.strip()]
+            
+            # Add new successful proxies (avoid duplicates)
+            existing_set = set(existing)
+            for proxy in successful:
+                if proxy not in existing_set:
+                    existing.append(proxy)
+                    existing_set.add(proxy)
+            
+            # Write working proxies
+            with working_path.open("w", encoding="utf-8") as fh:
+                for proxy in existing:
+                    fh.write(proxy + "\n")
+            
+            logger.info("Saved %d working proxies to %s (%d total)", 
+                       len(successful), working_path, len(existing))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to save working proxies: %s", exc)
+
+    def _reload_main_from_backup(self) -> None:
+        """Reload main proxies file from backup when it's empty."""
+        if not self._proxies_file_path:
+            return
+        
+        backup_path = self._proxies_file_path.with_suffix(".txt.backup")
         if backup_path and backup_path.exists():
+            try:
+                import shutil
+                shutil.copy2(backup_path, self._proxies_file_path)
+                logger.info("Reloaded main proxies file from backup (%s)", backup_path)
+                
+                # Reload proxies from the restored file
+                with self._proxies_file_path.open("r", encoding="utf-8") as fh:
+                    self._all_proxies = [line.strip() for line in fh if line.strip() and not line.strip().startswith("#")]
+                self._original_proxies = list(self._all_proxies)
+                
+                # Reset progress and reorganize
+                self._consumed_batches = 0
+                self._current_batch_index = 0
+                self._batch_429_count = {}
+                self._save_progress()
+                self._organize_all_batches()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Failed to reload from backup: %s", exc)
+
+    def _reload_all_proxies(self) -> None:
+        """Reload all proxies from backup/original and reset progress. Restore main file from backup."""
+        backup_path = self._proxies_file_path.with_suffix(".txt.backup") if self._proxies_file_path else None
+        
+        # Restore main file from backup
+        if backup_path and backup_path.exists() and self._proxies_file_path:
+            try:
+                import shutil
+                shutil.copy2(backup_path, self._proxies_file_path)
+                logger.info("Restored proxies file from backup: %s", backup_path)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Failed to restore proxies file from backup: %s", exc)
+        
+        # Reload proxies from the restored file
+        if self._proxies_file_path and self._proxies_file_path.exists():
+            with self._proxies_file_path.open("r", encoding="utf-8") as fh:
+                self._all_proxies = [line.strip() for line in fh if line.strip() and not line.strip().startswith("#")]
+            logger.info("Reloaded %d proxies from restored main file", len(self._all_proxies))
+        elif backup_path and backup_path.exists():
             with backup_path.open("r", encoding="utf-8") as fh:
                 self._all_proxies = [line.strip() for line in fh if line.strip() and not line.strip().startswith("#")]
             logger.info("Reloaded %d proxies from backup", len(self._all_proxies))
-        elif self._proxies_file_path and self._proxies_file_path.exists():
-            with self._proxies_file_path.open("r", encoding="utf-8") as fh:
-                self._all_proxies = [line.strip() for line in fh if line.strip() and not line.strip().startswith("#")]
-            logger.info("Reloaded %d proxies from current file", len(self._all_proxies))
         else:
-            # Fallback to original
             self._all_proxies = list(self._original_proxies)
             logger.info("Reloaded %d proxies from original list", len(self._all_proxies))
+        
+        # Update original_proxies to match reloaded list
+        self._original_proxies = list(self._all_proxies)
         
         # Reset progress
         self._consumed_batches = 0
         self._current_batch_index = 0
         self._main_batches_exhausted = False
         self._rest_pool = []
+        self._batch_429_count = {}
         self._save_progress()
         
         # Reorganize batches
@@ -242,16 +337,27 @@ proxy_check_url: str = "https://api.ipify.org",
         
         # Skip already consumed batches
         if self._consumed_batches > 0:
-            for i in range(min(self._consumed_batches, len(self._all_batches))):
-                self._batch_states[i] = "exhausted"
-            self._current_batch_index = self._consumed_batches
-            logger.info("Skipping first %d consumed batches; starting at batch %d", 
-                       self._consumed_batches, self._current_batch_index + 1)
+            # If consumed batches exceed available batches, reset and use current file
+            if self._consumed_batches >= len(self._all_batches):
+                logger.info("Consumed batches (%d) >= available batches (%d); resetting progress and starting fresh", 
+                           self._consumed_batches, len(self._all_batches))
+                self._consumed_batches = 0
+                self._current_batch_index = 0
+                self._rest_pool = []
+                self._main_batches_exhausted = False
+                self._save_progress()
+            else:
+                for i in range(self._consumed_batches):
+                    self._batch_states[i] = "exhausted"
+                self._current_batch_index = self._consumed_batches
+                logger.info("Skipping first %d consumed batches; starting at batch %d", 
+                           self._consumed_batches, self._current_batch_index + 1)
         else:
             self._current_batch_index = 0
         
         self._rest_pool = []
         self._main_batches_exhausted = False
+        self._batch_429_count = {}
         logger.info("Organized %d proxies into %d batches of size %d (%d available)", 
                    len(self._all_proxies), len(self._all_batches), self._proxy_batch_size,
                    len(self._all_batches) - self._consumed_batches)
@@ -391,6 +497,35 @@ proxy_check_url: str = "https://api.ipify.org",
         self._update_proxies_file(batch_index)
         
         self._current_batch_index += 1
+
+    def _mark_batch_rate_limited(self, batch_index: int) -> None:
+        """Mark a batch as rate-limited. Move to next batch immediately without exhausting all proxies."""
+        # If batch has some successful proxies, move them to rest pool
+        successful = self._batch_successful_proxies.get(batch_index, [])
+        if successful:
+            rest_until = time.time() + self._rest_duration_seconds
+            for proxy in successful:
+                self._rest_pool.append((proxy, rest_until))
+            logger.info("Batch %d rate-limited: %d successful proxies moved to rest pool", 
+                       batch_index + 1, len(successful))
+        
+        # Mark all remaining validated proxies as failed
+        validated = self._batch_validated.get(batch_index, [])
+        failed_set = self._batch_failed_proxies.get(batch_index, set())
+        for proxy in validated:
+            if proxy not in successful:
+                failed_set.add(proxy)
+        self._batch_failed_proxies[batch_index] = failed_set
+        
+        # Mark batch as exhausted and move on
+        self._batch_states[batch_index] = "exhausted"
+        self._consumed_batches = max(self._consumed_batches, batch_index + 1)
+        self._save_progress()
+        self._update_proxies_file(batch_index)
+        self._current_batch_index += 1
+        # Reset 429 counter for new batch
+        self._batch_429_count = {}
+        logger.info("Batch %d rate-limited; skipping to next batch", batch_index + 1)
 
     def _mark_proxy_successful(self, proxy_dict: dict[str, str] | None) -> None:
         """Mark a proxy as successful (got 200) in the current batch."""
@@ -570,6 +705,8 @@ proxy_check_url: str = "https://api.ipify.org",
     def set_proxies_file_path(self, path: str | Path) -> None:
         """Set the path to the proxies file for persistence."""
         self._proxies_file_path = Path(path)
+        # Ensure backup file exists
+        self._ensure_backup_file()
 
     def _apply_proxy(self, proxy_dict: dict[str, str] | None) -> None:
         """Apply or remove proxy from session."""
@@ -604,12 +741,8 @@ proxy_check_url: str = "https://api.ipify.org",
         
         for attempt in range(self.max_retries + 1):
             try:
-                # Apply proxy rotation on retry attempts (after first attempt)
-                if attempt > 0 and self._all_batches:
-                    # Mark previous proxy as failed if we had one
-                    if current_proxy:
-                        self._mark_proxy_failed(current_proxy)
-                    
+                # Apply proxy on first attempt and retries
+                if self._all_batches:
                     current_proxy = self._get_next_proxy()
                     self._apply_proxy(current_proxy)
 
@@ -658,10 +791,29 @@ proxy_check_url: str = "https://api.ipify.org",
                         }
                         continue
 
+                # 429 = server rate limit - mark proxy as exhausted and rotate to next
                 if status_code == 429 and attempt < self.max_retries:
-                    logger.warning("Rate limited (429) for %s; rotating proxy (attempt %d/%d)", current_user.username, attempt + 1, self.max_retries)
+                    logger.warning("Rate limited (429) for %s; marking proxy exhausted, rotating (attempt %d/%d)", 
+                                  current_user.username, attempt + 1, self.max_retries)
+                    if current_proxy and self._all_batches:
+                        self._mark_proxy_failed(current_proxy)
+                    
+                    # Track 429s per batch - if multiple proxies in same batch get 429, skip the batch
+                    batch_idx = self._current_batch_index
+                    if batch_idx < len(self._all_batches):
+                        if not hasattr(self, '_batch_429_count'):
+                            self._batch_429_count = {}
+                        self._batch_429_count[batch_idx] = self._batch_429_count.get(batch_idx, 0) + 1
+                        
+                        # If 2+ proxies in same batch get 429, skip the whole batch
+                        if self._batch_429_count[batch_idx] >= 2:
+                            logger.warning("Batch %d has %d rate-limited proxies; skipping batch", 
+                                          batch_idx + 1, self._batch_429_count[batch_idx])
+                            self._mark_batch_rate_limited(batch_idx)
                     continue
-                if status_code in {429, 500, 502, 503, 504, 522, 524} and attempt < self.max_retries:
+                
+                # Other retryable server errors (5xx) - wait and retry
+                if status_code in {500, 502, 503, 504, 522, 524} and attempt < self.max_retries:
                     retry_after = response.headers.get("Retry-After")
                     wait = min(
                         float(retry_after) if retry_after and retry_after.isdigit() else (2.0 * (attempt + 1)),
@@ -691,8 +843,14 @@ proxy_check_url: str = "https://api.ipify.org",
                 )
             except requests.RequestException as exc:
                 last_exc = exc
-                # Mark proxy as failed on connection/SSL errors
-                if current_proxy and self._all_batches:
+                # Only mark proxy as failed on connection/SSL errors (proxy itself is broken)
+                # Timeouts and 429s are NOT proxy failures - they're server/network conditions
+                is_proxy_failure = isinstance(exc, (
+                    requests.exceptions.ConnectTimeout,
+                    requests.exceptions.ConnectionError,
+                    requests.exceptions.SSLError,
+                ))
+                if current_proxy and self._all_batches and is_proxy_failure:
                     self._mark_proxy_failed(current_proxy)
                 
                 if attempt < self.max_retries and self._all_batches:
