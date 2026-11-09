@@ -15,6 +15,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, List, Optional
+from collections import deque
 
 import requests
 import urllib3
@@ -85,11 +86,25 @@ class SignupClient:
         )
         self.db_path = db_path
         self._vpn_state_path = Path(self.db_path).parent / ".vpn_state.json"
-        self._original_proxies = proxies or []
-        self.proxies = list(self._original_proxies)
-        self._proxy_index = 0
-        self._failed_proxies: set[str] = set()
-        self._validated_proxies: set[str] = set()
+        
+        # Store ALL original proxies (1126) - don't filter yet
+        self._all_proxies = proxies or []
+        
+        # Batch configuration - split all proxies into batches of 10
+        self._proxy_batch_size = 10
+        self._all_batches: list[list[str]] = []
+        self._current_batch_index = 0
+        
+        # Track batch states: 'available', 'in_use', 'resting', 'exhausted'
+        self._batch_states: list[str] = []
+        self._batch_proxy_index: dict[int, int] = {}  # batch_index -> proxy_index
+        self._batch_validated: dict[int, list[str]] = {}  # batch_index -> validated proxies
+        self._batch_failed_proxies: dict[int, set[str]] = {}  # batch_index -> failed proxies
+        
+        # Rest pool: batches that have been used and are cooling down
+        self._rest_pool: deque[tuple[int, float]] = deque()  # (batch_index, rest_until_timestamp)
+        self._rest_duration_seconds = 300  # 5 minutes cooldown
+        
         self.verify_ssl = verify_ssl
         self.country = country
         self.default_password = default_password
@@ -123,6 +138,142 @@ class SignupClient:
                 "Referer": self.source_url,
             }
         )
+
+        # Organize all proxies into batches
+        self._organize_all_batches()
+
+    def _organize_all_batches(self) -> None:
+        """Split ALL proxies into batches of _proxy_batch_size (default 10)."""
+        if not self._all_proxies:
+            self._all_batches = []
+            self._batch_states = []
+            return
+        
+        self._all_batches = [
+            self._all_proxies[i:i + self._proxy_batch_size]
+            for i in range(0, len(self._all_proxies), self._proxy_batch_size)
+        ]
+        self._batch_states = ["available"] * len(self._all_batches)
+        self._batch_proxy_index = {i: 0 for i in range(len(self._all_batches))}
+        self._batch_validated = {i: [] for i in range(len(self._all_batches))}
+        self._batch_failed_proxies = {i: set() for i in range(len(self._all_batches))}
+        self._current_batch_index = 0
+        logger.info("Organized %d proxies into %d batches of size %d", 
+                   len(self._all_proxies), len(self._all_batches), self._proxy_batch_size)
+
+    def _get_current_batch(self) -> list[str] | None:
+        """Get the current batch, skipping exhausted/resting ones."""
+        # First, check if any resting batches are ready to be reused
+        self._check_rest_pool()
+        
+        # Find next available batch
+        while self._current_batch_index < len(self._all_batches):
+            state = self._batch_states[self._current_batch_index]
+            if state == "available":
+                return self._all_batches[self._current_batch_index]
+            elif state == "in_use":
+                return self._all_batches[self._current_batch_index]
+            self._current_batch_index += 1
+        
+        # No available batches - check if any are resting
+        if self._rest_pool:
+            wait_time = self._rest_pool[0][1] - time.time()
+            if wait_time > 0:
+                logger.info("All batches in use/resting; waiting %.1fs for next batch to be ready", wait_time)
+                time.sleep(wait_time)
+                self._check_rest_pool()
+                return self._get_current_batch()
+        
+        logger.warning("No batches available")
+        return None
+
+    def _check_rest_pool(self) -> None:
+        """Move batches from rest pool back to available if cooldown complete."""
+        now = time.time()
+        while self._rest_pool and self._rest_pool[0][1] <= now:
+            batch_idx, _ = self._rest_pool.popleft()
+            self._batch_states[batch_idx] = "available"
+            self._batch_failed_proxies[batch_idx].clear()
+            logger.info("Batch %d cooldown complete; moved back to available", batch_idx + 1)
+
+    def _validate_batch(self, batch_index: int) -> list[str]:
+        """Validate proxies in a batch. Returns list of working proxies."""
+        batch = self._all_batches[batch_index]
+        if not batch:
+            return []
+        
+        # Check if already validated
+        if self._batch_validated[batch_index]:
+            return self._batch_validated[batch_index]
+        
+        logger.info("Validating batch %d (%d proxies)...", batch_index + 1, len(batch))
+        
+        valid = []
+        with ThreadPoolExecutor(max_workers=self.max_workers_proxy_check) as executor:
+            future_to_proxy = {executor.submit(self._check_proxy, p): p for p in batch}
+            for future in as_completed(future_to_proxy):
+                proxy, is_valid = future.result()
+                if is_valid:
+                    valid.append(proxy)
+        
+        self._batch_validated[batch_index] = valid
+        logger.info("Batch %d validation complete: %d valid, %d invalid", 
+                   batch_index + 1, len(valid), len(batch) - len(valid))
+        return valid
+
+    def _get_next_proxy(self) -> dict[str, str] | None:
+        """Get the next working proxy from the current batch."""
+        # Get current batch
+        batch = self._get_current_batch()
+        if not batch:
+            return None
+        
+        batch_idx = self._current_batch_index
+        self._batch_states[batch_idx] = "in_use"
+        
+        # Validate batch if not done
+        validated = self._validate_batch(batch_idx)
+        if not validated:
+            logger.warning("Batch %d has no valid proxies; marking exhausted", batch_idx + 1)
+            self._mark_batch_exhausted(batch_idx)
+            return self._get_next_proxy()
+        
+        # Get next non-failed proxy from validated list
+        proxy_idx = self._batch_proxy_index[batch_idx]
+        failed_in_batch = self._batch_failed_proxies[batch_idx]
+        
+        attempts = 0
+        while attempts < len(validated):
+            proxy = validated[proxy_idx % len(validated)]
+            self._batch_proxy_index[batch_idx] += 1
+            proxy_idx = self._batch_proxy_index[batch_idx]
+            
+            if proxy not in failed_in_batch:
+                return {"http": proxy, "https": proxy}
+            attempts += 1
+        
+        # All proxies in this batch failed - mark batch exhausted
+        logger.info("Batch %d exhausted (all %d proxies failed); moving to rest pool", 
+                   batch_idx + 1, len(validated))
+        self._mark_batch_exhausted(batch_idx)
+        return self._get_next_proxy()
+
+    def _mark_batch_exhausted(self, batch_index: int) -> None:
+        """Mark a batch as exhausted and move to rest pool."""
+        self._batch_states[batch_index] = "exhausted"
+        rest_until = time.time() + self._rest_duration_seconds
+        self._rest_pool.append((batch_index, rest_until))
+        self._current_batch_index += 1
+        logger.info("Batch %d moved to rest pool for %.0fs", batch_index + 1, self._rest_duration_seconds)
+
+    def _mark_proxy_failed(self, proxy_dict: dict[str, str] | None) -> None:
+        """Mark a proxy as failed in the current batch."""
+        if proxy_dict:
+            proxy_url = proxy_dict.get("http")
+            if proxy_url:
+                batch_idx = self._current_batch_index
+                self._batch_failed_proxies[batch_idx].add(proxy_url)
+                logger.debug("Marked proxy as failed in batch %d: %s", batch_idx + 1, proxy_url)
 
     def preflight(self) -> dict[str, Any]:
         """Check outbound connectivity before sending registrations."""
@@ -160,13 +311,15 @@ class SignupClient:
         except Exception:  # noqa: BLE001
             pass
 
-        # Validate proxies on first preflight if enabled
-        if self.auto_validate_proxies and not self._proxy_validation_done and self.proxies:
-            logger.info("Running initial proxy validation...")
-            self.validate_proxies()
+        # Validate proxies on first preflight if enabled - just validate first batch
+        if self.auto_validate_proxies and not self._proxy_validation_done and self._all_batches:
+            logger.info("Running initial proxy validation on first batch...")
+            self._validate_batch(0)
             self._proxy_validation_done = True
-            info["proxies_validated"] = len(self.proxies)
-            info["proxies_removed"] = len(self._original_proxies) - len(self.proxies)
+            validated_count = len(self._batch_validated.get(0, []))
+            info["proxies_validated"] = validated_count
+            info["total_batches"] = len(self._all_batches)
+            info["proxies_in_first_batch"] = len(self._all_batches[0]) if self._all_batches else 0
 
         return info
 
@@ -209,88 +362,41 @@ class SignupClient:
         return proxy, False
 
     def validate_proxies(self, proxies: list[str] | None = None, persist: bool = True) -> list[str]:
-        """Validate a list of proxies in parallel. Returns list of working proxies."""
-        target_proxies = proxies or self.proxies
-        if not target_proxies:
-            logger.warning("No proxies to validate")
+        """Validate all proxy batches. Returns list of all working proxies across all batches."""
+        if not self._all_batches:
+            logger.warning("No proxy batches to validate")
             return []
         
-        logger.info("Validating %d proxies (timeout=%ds, max_workers=%d)...", 
-                    len(target_proxies), self.proxy_check_timeout, self.max_workers_proxy_check)
+        all_valid = []
+        for i in range(len(self._all_batches)):
+            valid = self._validate_batch(i)
+            all_valid.extend(valid)
         
-        valid = []
-        invalid = []
+        logger.info("All batches validation complete: %d total valid proxies", len(all_valid))
         
-        with ThreadPoolExecutor(max_workers=self.max_workers_proxy_check) as executor:
-            future_to_proxy = {executor.submit(self._check_proxy, p): p for p in target_proxies}
-            for future in as_completed(future_to_proxy):
-                proxy, is_valid = future.result()
-                if is_valid:
-                    valid.append(proxy)
-                    self._validated_proxies.add(proxy)
-                else:
-                    invalid.append(proxy)
-        
-        logger.info("Proxy validation complete: %d valid, %d invalid", len(valid), len(invalid))
-        
-        if invalid:
-            logger.debug("Invalid proxies removed: %s", invalid)
-        
-        # Update internal proxy list to only valid ones
-        self.proxies = valid
-        
-        # Persist valid proxies to file if configured
         if persist and self.persist_valid_proxies and self._proxies_file_path:
             self._persist_proxies()
         
-        return valid
+        return all_valid
 
     def _persist_proxies(self) -> None:
-        """Save current valid proxies to the proxies file."""
+        """Save current valid proxies from all batches to the proxies file."""
         if not self._proxies_file_path:
             return
         try:
-            # Read original file to preserve comments/formatting if needed, or just write valid ones
+            all_valid = []
+            for batch_valid in self._batch_validated.values():
+                all_valid.extend(batch_valid)
             with self._proxies_file_path.open("w", encoding="utf-8") as fh:
-                for proxy in self.proxies:
+                for proxy in all_valid:
                     fh.write(proxy + "\n")
-            logger.info("Persisted %d valid proxies to %s", len(self.proxies), self._proxies_file_path)
+            logger.info("Persisted %d valid proxies to %s", len(all_valid), self._proxies_file_path)
         except Exception as exc:  # noqa: BLE001
             logger.error("Failed to persist proxies: %s", exc)
 
     def set_proxies_file_path(self, path: str | Path) -> None:
         """Set the path to the proxies file for persistence."""
         self._proxies_file_path = Path(path)
-
-    def _get_next_proxy(self) -> dict[str, str] | None:
-        """Get the next healthy proxy from the list. Returns None if no proxies available."""
-        if not self.proxies:
-            return None
-        
-        available = [p for p in self.proxies if p not in self._failed_proxies]
-        if not available:
-            # All proxies failed, reset and try all
-            logger.warning("All proxies marked as failed; resetting failed proxy list")
-            self._failed_proxies.clear()
-            available = self.proxies
-        
-        proxy = available[self._proxy_index % len(available)]
-        self._proxy_index += 1
-        return {"http": proxy, "https": proxy}
-
-    def _mark_proxy_failed(self, proxy_dict: dict[str, str] | None) -> None:
-        """Mark a proxy as failed so it will be skipped."""
-        if proxy_dict:
-            proxy_url = proxy_dict.get("http")
-            if proxy_url:
-                self._failed_proxies.add(proxy_url)
-                # Also remove from validated set
-                self._validated_proxies.discard(proxy_url)
-                logger.debug("Marked proxy as failed: %s", proxy_url)
-                
-                # Persist updated proxy list
-                if self.persist_valid_proxies and self._proxies_file_path:
-                    self._persist_proxies()
 
     def _apply_proxy(self, proxy_dict: dict[str, str] | None) -> None:
         """Apply or remove proxy from session."""
@@ -326,7 +432,7 @@ class SignupClient:
         for attempt in range(self.max_retries + 1):
             try:
                 # Apply proxy rotation on retry attempts (after first attempt)
-                if attempt > 0 and self.proxies:
+                if attempt > 0 and self._all_batches:
                     # Mark previous proxy as failed if we had one
                     if current_proxy:
                         self._mark_proxy_failed(current_proxy)
@@ -411,10 +517,10 @@ class SignupClient:
             except requests.RequestException as exc:
                 last_exc = exc
                 # Mark proxy as failed on connection/SSL errors
-                if current_proxy and self.proxies:
+                if current_proxy and self._all_batches:
                     self._mark_proxy_failed(current_proxy)
                 
-                if attempt < self.max_retries and self.proxies:
+                if attempt < self.max_retries and self._all_batches:
                     logger.warning("Request error for %s: %s; rotating proxy (attempt %d/%d)", current_user.username, exc, attempt + 1, self.max_retries)
                     continue
                 if attempt < self.max_retries:

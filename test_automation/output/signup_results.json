@@ -1,101 +1,64 @@
 {
   "summary": {
-    "total": 5,
-    "successful": 5,
-    "failed": 0,
-    "successful_users": [
-      "7xhgh3lc",
-      "mh2gx16c",
-      "yau08brw",
-      "h6gziybp",
-      "j3q35kk6"
+    "total": 3,
+    "successful": 0,
+    "failed": 3,
+    "successful_users": [],
+    "failed_users": [
+      "y9utolg9",
+      "2mtt84r3",
+      "idryw248"
     ],
-    "failed_users": [],
-    "errors": []
+    "errors": [
+      "{'error': 'Too many registrations from this network. Please try again later or use mobile data.'}",
+      "{'error': 'Too many registrations from this network. Please try again later or use mobile data.'}",
+      "{'error': 'Too many registrations from this network. Please try again later or use mobile data.'}"
+    ]
   },
   "preflight": {
     "api_reachable": true,
     "public_ip": "41.89.227.171",
     "api_status": 200,
     "vpn_ip_changed": false,
-    "proxies_validated": 10,
-    "proxies_removed": 0
+    "proxies_validated": 7,
+    "proxies_removed": 3
   },
   "results": [
     {
-      "username": "7xhgh3lc",
-      "email": "w0wt3pgp@gmail.com",
-      "phone": "8433458284",
+      "username": "y9utolg9",
+      "email": "pvndrknr@gmail.com",
+      "phone": "0345114336",
       "country": "United States",
-      "success": true,
-      "status_code": 200,
+      "success": false,
+      "status_code": 429,
       "response": {
-        "success": true,
-        "userid": "ASD1039449",
-        "username": "7xhgh3lc",
-        "metaEventId": "reg.ASD1039449.1794213528911.371daa1d"
+        "error": "Too many registrations from this network. Please try again later or use mobile data."
       },
-      "error_message": null
+      "error_message": "{'error': 'Too many registrations from this network. Please try again later or use mobile data.'}"
     },
     {
-      "username": "mh2gx16c",
-      "email": "3ivaftan@gmail.com",
-      "phone": "7592932625",
+      "username": "2mtt84r3",
+      "email": "9pezjkhz@gmail.com",
+      "phone": "4096141752",
       "country": "United States",
-      "success": true,
-      "status_code": 200,
+      "success": false,
+      "status_code": 429,
       "response": {
-        "success": true,
-        "userid": "ASD8768995",
-        "username": "mh2gx16c",
-        "metaEventId": "reg.ASD8768995.1794213530299.f8c583c9"
+        "error": "Too many registrations from this network. Please try again later or use mobile data."
       },
-      "error_message": null
+      "error_message": "{'error': 'Too many registrations from this network. Please try again later or use mobile data.'}"
     },
     {
-      "username": "yau08brw",
-      "email": "j30n760o@gmail.com",
-      "phone": "5345766634",
+      "username": "idryw248",
+      "email": "qplojnle@gmail.com",
+      "phone": "5317756204",
       "country": "United States",
-      "success": true,
-      "status_code": 200,
+      "success": false,
+      "status_code": 429,
       "response": {
-        "success": true,
-        "userid": "ASD9851870",
-        "username": "yau08brw",
-        "metaEventId": "reg.ASD9851870.1794213538910.35feb940"
+        "error": "Too many registrations from this network. Please try again later or use mobile data."
       },
-      "error_message": null
-    },
-    {
-      "username": "h6gziybp",
-      "email": "oe1mlas2@gmail.com",
-      "phone": "1348887398",
-      "country": "United States",
-      "success": true,
-      "status_code": 200,
-      "response": {
-        "success": true,
-        "userid": "ASD8477129",
-        "username": "h6gziybp",
-        "metaEventId": "reg.ASD8477129.1794213545624.1b10a2ba"
-      },
-      "error_message": null
-    },
-    {
-      "username": "j3q35kk6",
-      "email": "065n7a1z@gmail.com",
-      "phone": "4782532346",
-      "country": "United States",
-      "success": true,
-      "status_code": 200,
-      "response": {
-        "success": true,
-        "userid": "ASD2161780",
-        "username": "j3q35kk6",
-        "metaEventId": "reg.ASD2161780.1794213547615.56509d41"
-      },
-      "error_message": null
+      "error_message": "{'error': 'Too many registrations from this network. Please try again later or use mobile data.'}"
     }
   ]
 }
