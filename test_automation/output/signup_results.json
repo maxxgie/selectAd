@@ -1,169 +1,99 @@
 {
   "summary": {
-    "total": 10,
+    "total": 5,
     "successful": 5,
-    "failed": 5,
+    "failed": 0,
     "successful_users": [
-      "f5ohv9n4",
-      "jfvz1ncx",
-      "o0daujos",
-      "v2v34rb3",
-      "civ9nhjb"
+      "7xhgh3lc",
+      "mh2gx16c",
+      "yau08brw",
+      "h6gziybp",
+      "j3q35kk6"
     ],
-    "failed_users": [
-      "ruzi21al",
-      "wv874uf4",
-      "clr7hwx3",
-      "3rjfuxli",
-      "11uv7f8b"
-    ],
-    "errors": [
-      "{'error': 'Email or phone already registered'}",
-      "{'error': 'Email or phone already registered'}",
-      "{'error': 'Email or phone already registered'}",
-      "{'error': 'Email or phone already registered'}",
-      "{'error': 'Email or phone already registered'}"
-    ]
+    "failed_users": [],
+    "errors": []
   },
   "preflight": {
     "api_reachable": true,
-    "public_ip": "103.216.221.93",
+    "public_ip": "41.89.227.171",
     "api_status": 200,
-    "vpn_ip_changed": false
+    "vpn_ip_changed": false,
+    "proxies_validated": 10,
+    "proxies_removed": 0
   },
   "results": [
     {
-      "username": "ruzi21al",
-      "email": "ef98pdir@gmail.com",
-      "phone": "8326879726",
-      "country": "United States",
-      "success": false,
-      "status_code": 400,
-      "response": {
-        "error": "Email or phone already registered"
-      },
-      "error_message": "{'error': 'Email or phone already registered'}"
-    },
-    {
-      "username": "wv874uf4",
-      "email": "qm23pjl8@gmail.com",
-      "phone": "8394641861",
-      "country": "United States",
-      "success": false,
-      "status_code": 400,
-      "response": {
-        "error": "Email or phone already registered"
-      },
-      "error_message": "{'error': 'Email or phone already registered'}"
-    },
-    {
-      "username": "f5ohv9n4",
-      "email": "yol2ezy0@gmail.com",
-      "phone": "9505561256",
+      "username": "7xhgh3lc",
+      "email": "w0wt3pgp@gmail.com",
+      "phone": "8433458284",
       "country": "United States",
       "success": true,
       "status_code": 200,
       "response": {
         "success": true,
-        "userid": "ASD2661034",
-        "username": "f5ohv9n4",
-        "metaEventId": "reg.ASD2661034.1794167489655.6eda356e"
+        "userid": "ASD1039449",
+        "username": "7xhgh3lc",
+        "metaEventId": "reg.ASD1039449.1794213528911.371daa1d"
       },
       "error_message": null
     },
     {
-      "username": "jfvz1ncx",
-      "email": "f6zxojsx@gmail.com",
-      "phone": "4253778174",
+      "username": "mh2gx16c",
+      "email": "3ivaftan@gmail.com",
+      "phone": "7592932625",
       "country": "United States",
       "success": true,
       "status_code": 200,
       "response": {
         "success": true,
-        "userid": "ASD1016739",
-        "username": "jfvz1ncx",
-        "metaEventId": "reg.ASD1016739.1794167494532.9aa7de34"
+        "userid": "ASD8768995",
+        "username": "mh2gx16c",
+        "metaEventId": "reg.ASD8768995.1794213530299.f8c583c9"
       },
       "error_message": null
     },
     {
-      "username": "o0daujos",
-      "email": "xql23h19@gmail.com",
-      "phone": "7978562590",
+      "username": "yau08brw",
+      "email": "j30n760o@gmail.com",
+      "phone": "5345766634",
       "country": "United States",
       "success": true,
       "status_code": 200,
       "response": {
         "success": true,
-        "userid": "ASD1872029",
-        "username": "o0daujos",
-        "metaEventId": "reg.ASD1872029.1794167498090.6f694df1"
+        "userid": "ASD9851870",
+        "username": "yau08brw",
+        "metaEventId": "reg.ASD9851870.1794213538910.35feb940"
       },
       "error_message": null
     },
     {
-      "username": "v2v34rb3",
-      "email": "ips7pto5@gmail.com",
-      "phone": "9333154395",
+      "username": "h6gziybp",
+      "email": "oe1mlas2@gmail.com",
+      "phone": "1348887398",
       "country": "United States",
       "success": true,
       "status_code": 200,
       "response": {
         "success": true,
-        "userid": "ASD8372577",
-        "username": "v2v34rb3",
-        "metaEventId": "reg.ASD8372577.1794167504795.1ec98c4b"
+        "userid": "ASD8477129",
+        "username": "h6gziybp",
+        "metaEventId": "reg.ASD8477129.1794213545624.1b10a2ba"
       },
       "error_message": null
     },
     {
-      "username": "clr7hwx3",
-      "email": "dmnhd18l@gmail.com",
-      "phone": "9422260409",
-      "country": "United States",
-      "success": false,
-      "status_code": 400,
-      "response": {
-        "error": "Email or phone already registered"
-      },
-      "error_message": "{'error': 'Email or phone already registered'}"
-    },
-    {
-      "username": "3rjfuxli",
-      "email": "lh8kez3k@gmail.com",
-      "phone": "5836896800",
-      "country": "United States",
-      "success": false,
-      "status_code": 400,
-      "response": {
-        "error": "Email or phone already registered"
-      },
-      "error_message": "{'error': 'Email or phone already registered'}"
-    },
-    {
-      "username": "11uv7f8b",
-      "email": "3kau0kdw@gmail.com",
-      "phone": "9491575735",
-      "country": "United States",
-      "success": false,
-      "status_code": 400,
-      "response": {
-        "error": "Email or phone already registered"
-      },
-      "error_message": "{'error': 'Email or phone already registered'}"
-    },
-    {
-      "username": "civ9nhjb",
-      "email": "7elsfbif@gmail.com",
-      "phone": "1639532242",
+      "username": "j3q35kk6",
+      "email": "065n7a1z@gmail.com",
+      "phone": "4782532346",
       "country": "United States",
       "success": true,
       "status_code": 200,
       "response": {
         "success": true,
-        "userid": "ASD9068279",
-        "username": "civ9nhjb",
-        "metaEventId": "reg.ASD9068279.1794167572599.c700f36c"
+        "userid": "ASD2161780",
+        "username": "j3q35kk6",
+        "metaEventId": "reg.ASD2161780.1794213547615.56509d41"
       },
       "error_message": null
     }

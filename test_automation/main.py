@@ -5,7 +5,9 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import signal
 import sys
+import time
 from pathlib import Path
 
 # Ensure the project root is importable when run as `python main.py`.
@@ -19,6 +21,19 @@ from testing.signup_client import SignupClient  # noqa: E402
 from utils.config import load_config, setup_logging  # noqa: E402
 
 logger = logging.getLogger(__name__)
+
+# Global flag for graceful shutdown
+_shutdown_requested = False
+
+
+def _signal_handler(signum, frame):
+    global _shutdown_requested
+    _shutdown_requested = True
+    logger.warning("Shutdown requested (signal %d); finishing current request...", signum)
+
+
+signal.signal(signal.SIGINT, _signal_handler)
+signal.signal(signal.SIGTERM, _signal_handler)
 
 
 def cmd_generate(args: argparse.Namespace, cfg) -> int:
@@ -74,12 +89,40 @@ def cmd_submit(args: argparse.Namespace, cfg) -> int:
         network_reset_wait_seconds=cfg.network_reset_wait_seconds,
         source_url=cfg.source_url,
         db_path=cfg.db_path,
+        proxies=cfg.proxies,
+        verify_ssl=cfg.verify_ssl,
+        country=cfg.country,
+        default_password=cfg.default_password,
+        username_length=cfg.username_length,
+        proxy_check_timeout=getattr(cfg, "proxy_check_timeout", 5),
+        proxy_check_url=getattr(cfg, "proxy_check_url", "https://api.ipify.org"),
+        max_workers_proxy_check=getattr(cfg, "max_workers_proxy_check", 20),
+        auto_validate_proxies=getattr(cfg, "auto_validate_proxies", True),
+        persist_valid_proxies=getattr(cfg, "persist_valid_proxies", True),
     )
+    # Set proxies file path for persistence
+    proxies_path = getattr(cfg, "proxies_path", None)
+    if proxies_path:
+        client.set_proxies_file_path(Path(proxies_path) if not Path(proxies_path).is_absolute() 
+                                      else Path(proxies_path))
     try:
         if getattr(cfg, "preflight_before_submit", True):
             pre = client.preflight()
             logger.info("Preflight: %s", pre)
-        results = client.run(users)
+        
+        # Run submissions with graceful shutdown support
+        results: list = []
+        for i, user in enumerate(users):
+            if _shutdown_requested:
+                logger.warning("Shutdown requested; stopping after %d submissions", i)
+                break
+            results.append(client.signup(user))
+            if i < len(users) - 1:
+                if cfg.batch_size and (i + 1) % cfg.batch_size == 0:
+                    time.sleep(cfg.batch_delay_seconds)
+                elif cfg.request_delay_seconds:
+                    time.sleep(cfg.request_delay_seconds)
+        
         summary = client.summary(results)
     finally:
         client.close()

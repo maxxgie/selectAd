@@ -18,5 +18,12 @@
   "network_reset_wait_seconds": 10.0,
   "preflight_before_submit": true,
   "person_config_path": "config/person.json",
-  "username_length": 8
+  "username_length": 8,
+  "proxies_path": "config/proxies.txt",
+  "verify_ssl": false,
+  "proxy_check_timeout": 5,
+  "proxy_check_url": "https://api.ipify.org",
+  "max_workers_proxy_check": 20,
+  "auto_validate_proxies": true,
+  "persist_valid_proxies": true
 }

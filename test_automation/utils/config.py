@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[1] / "config.json"
 ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
+DEFAULT_PROXIES_PATH = Path(__file__).resolve().parents[1] / "config/proxies.txt"
 
 
 @dataclass
@@ -55,6 +56,13 @@ class Config:
     network_reset_wait_seconds: float = 10.0
     preflight_before_submit: bool = True
     username_length: int = 8
+    proxies: list[str] | None = None
+    verify_ssl: bool = True
+    proxy_check_timeout: int = 5
+    proxy_check_url: str = "https://api.ipify.org"
+    max_workers_proxy_check: int = 20
+    auto_validate_proxies: bool = True
+    persist_valid_proxies: bool = True
 
 
 def _parse_bool(value: Any) -> bool:
@@ -63,6 +71,26 @@ def _parse_bool(value: Any) -> bool:
     if value is None:
         return False
     return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _load_proxies(proxies_path: str | Path | None, config_base: Path | None = None) -> list[str] | None:
+    """Load proxy list from a file (one per line). Returns None if not found."""
+    if proxies_path is None:
+        return None
+    path = Path(proxies_path)
+    if not path.is_absolute() and config_base is not None:
+        path = config_base / path
+    if not path.exists():
+        logger.warning("Proxies file %s not found; no proxies loaded", path)
+        return None
+    try:
+        with path.open("r", encoding="utf-8") as fh:
+            lines = [line.strip() for line in fh if line.strip() and not line.strip().startswith("#")]
+        logger.info("Loaded %d proxies from %s", len(lines), path)
+        return lines
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Failed to load proxies from %s: %s", path, exc)
+        return None
 
 
 def load_config(config_path: str | Path | None = None) -> Config:
@@ -89,6 +117,9 @@ def load_config(config_path: str | Path | None = None) -> Config:
         logger.info("Loaded person config from %s", person_path)
     else:
         logger.warning("Person config %s not found; using config.json defaults", person_path)
+
+    # Load proxies from config file or default location
+    proxies = _load_proxies(data.get("proxies_path"), path.parent)
 
     return Config(
         country=os.environ.get("COUNTRY", person_data.get("country", data.get("country", "United States"))),
@@ -145,6 +176,13 @@ def load_config(config_path: str | Path | None = None) -> Config:
         ),
         username_length=int(os.environ.get("USERNAME_LENGTH", data.get("username_length", 8))),
         person_config_path=data.get("person_config_path", "config/person.json"),
+        proxies=proxies,
+        verify_ssl=data.get("verify_ssl", True),
+        proxy_check_timeout=data.get("proxy_check_timeout", 5),
+        proxy_check_url=data.get("proxy_check_url", "https://api.ipify.org"),
+        max_workers_proxy_check=data.get("max_workers_proxy_check", 20),
+        auto_validate_proxies=data.get("auto_validate_proxies", True),
+        persist_valid_proxies=data.get("persist_valid_proxies", True),
     )
 
 
