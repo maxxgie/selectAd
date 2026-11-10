@@ -1,3 +1,4 @@
+<<<<<<< ours
 {
   "country": "United States",
   "default_password": "12345678",
@@ -27,3 +28,34 @@
   "auto_validate_proxies": true,
   "persist_valid_proxies": true
 }
+=======
+{
+  "country": "United States",
+  "default_password": "12345678",
+  "users_to_generate": 100,
+  "environment": "production",
+  "allow_remote_signup": true,
+  "output_dir": "output",
+  "log_level": "INFO",
+  "db_path": "output/test_users.db",
+  "csv_path": "output/test_users.csv",
+  "json_path": "output/test_users.json",
+  "results_path": "output/signup_results.json",
+  "request_delay_seconds": 0.5,
+  "request_max_retries": 4,
+  "batch_size": 0,
+  "batch_delay_seconds": 0.0,
+  "network_reset_command": "",
+  "network_reset_wait_seconds": 10.0,
+  "preflight_before_submit": true,
+  "person_config_path": "config/person.json",
+  "username_length": 8,
+  "proxies_path": "config/proxies.txt",
+  "verify_ssl": false,
+  "proxy_check_timeout": 5,
+  "proxy_check_url": "https://api.ipify.org",
+  "max_workers_proxy_check": 20,
+  "auto_validate_proxies": true,
+  "persist_valid_proxies": true
+}
+>>>>>>> theirs
