@@ -41,6 +41,18 @@ class SQLiteManager:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS signup_results (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL,
+                success INTEGER NOT NULL,
+                status_code INTEGER,
+                error_message TEXT,
+                submitted_at TEXT NOT NULL
+            )
+            """
+        )
         conn.commit()
 
     def insert_user(self, user: TestUser) -> None:
@@ -99,6 +111,18 @@ class SQLiteManager:
         """Delete a user by username after successful submission."""
         conn = self.connect()
         conn.execute("DELETE FROM users WHERE username = ?", (username,))
+        conn.commit()
+
+    def save_signup_result(self, username: str, success: bool, status_code: int | None, error_message: str | None = None) -> None:
+        """Save a signup result to the results table."""
+        conn = self.connect()
+        conn.execute(
+            """
+            INSERT INTO signup_results (username, success, status_code, error_message, submitted_at)
+            VALUES (?, ?, ?, ?, datetime('now'))
+            """,
+            (username, 1 if success else 0, status_code, error_message),
+        )
         conn.commit()
 
     def delete_all_users(self) -> None:

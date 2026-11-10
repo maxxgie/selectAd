@@ -286,33 +286,22 @@ proxy_check_url: str = "https://api.ipify.org",
         backup_path = self._proxies_file_path.with_suffix(".txt.backup")
         if backup_path and backup_path.exists():
             try:
-                # Read backup, deduplicate
-                with backup_path.open("r", encoding="utf-8") as fh:
-                    backup_lines = [line.strip() for line in fh if line.strip() and not line.strip().startswith("#")]
+                # Copy backup to main
+                with backup_path.open("r", encoding="utf-8") as src:
+                    content = src.read()
+                with self._proxies_file_path.open("w", encoding="utf-8") as dst:
+                    dst.write(content)
                 
-                # Deduplicate while preserving order
-                seen = set()
-                unique_proxies = []
-                for p in backup_lines:
-                    if p not in seen:
-                        seen.add(p)
-                        unique_proxies.append(p)
-                
-                # Write deduplicated proxies to main file
-                with self._proxies_file_path.open("w", encoding="utf-8") as fh:
-                    for proxy in unique_proxies:
-                        fh.write(proxy + "\n")
-                
-                # Clear backup file after successful reload
+                # Clear backup
                 with backup_path.open("w", encoding="utf-8") as fh:
-                    pass  # Truncate to empty
+                    pass
                 
-                logger.info("Reloaded main proxies file from backup: %d unique proxies (was %d lines); backup cleared", 
-                           len(unique_proxies), len(backup_lines))
-                
-                # Reload proxies from the restored file
-                self._all_proxies = list(unique_proxies)
+                # Reload proxies from main file
+                with self._proxies_file_path.open("r", encoding="utf-8") as fh:
+                    self._all_proxies = [line.strip() for line in fh if line.strip() and not line.strip().startswith("#")]
                 self._original_proxies = list(self._all_proxies)
+                
+                logger.info("Reloaded main proxies file from backup (%d proxies); backup cleared", len(self._all_proxies))
                 
                 # Reset progress and reorganize
                 self._consumed_batches = 0
@@ -327,34 +316,22 @@ proxy_check_url: str = "https://api.ipify.org",
         """Reload all proxies from backup/original and reset progress. Restore main file from backup."""
         backup_path = self._proxies_file_path.with_suffix(".txt.backup") if self._proxies_file_path else None
         
-        # Use the same deduplication logic as _reload_main_from_backup
-        if backup_path and backup_path.exists():
+        # Copy backup to main
+        if backup_path and backup_path.exists() and self._proxies_file_path:
             try:
-                # Read backup, deduplicate
-                with backup_path.open("r", encoding="utf-8") as fh:
-                    backup_lines = [line.strip() for line in fh if line.strip() and not line.strip().startswith("#")]
+                with backup_path.open("r", encoding="utf-8") as src:
+                    content = src.read()
+                with self._proxies_file_path.open("w", encoding="utf-8") as dst:
+                    dst.write(content)
                 
-                seen = set()
-                unique_proxies = []
-                for p in backup_lines:
-                    if p not in seen:
-                        seen.add(p)
-                        unique_proxies.append(p)
-                
-                # Write deduplicated proxies to main file
-                if self._proxies_file_path:
-                    with self._proxies_file_path.open("w", encoding="utf-8") as fh:
-                        for proxy in unique_proxies:
-                            fh.write(proxy + "\n")
-                
-                # Clear backup file after successful reload
+                # Clear backup
                 with backup_path.open("w", encoding="utf-8") as fh:
-                    pass  # Truncate to empty
+                    pass
                 
-                logger.info("Reloaded %d unique proxies from backup (was %d lines); backup cleared", 
-                           len(unique_proxies), len(backup_lines))
-                
-                self._all_proxies = list(unique_proxies)
+                # Reload proxies from main file
+                with self._proxies_file_path.open("r", encoding="utf-8") as fh:
+                    self._all_proxies = [line.strip() for line in fh if line.strip() and not line.strip().startswith("#")]
+                logger.info("Reloaded %d proxies from backup; backup cleared", len(self._all_proxies))
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Failed to reload from backup: %s", exc)
                 self._all_proxies = list(self._original_proxies)
@@ -808,9 +785,9 @@ proxy_check_url: str = "https://api.ipify.org",
                     self._mark_proxy_successful(current_proxy)
                     try:
                         with SQLiteManager(self.db_path) as db:
-                            db.delete_user(current_user.username)
+                            db.save_signup_result(current_user.username, True, status_code)
                     except Exception as exc:  # noqa: BLE001
-                        logger.error("Failed to delete submitted user %s from DB: %s", current_user.username, exc)
+                        logger.error("Failed to save signup result: %s", exc)
                     return SignupResult(
                         user=current_user, success=True, status_code=status_code, response=response_json
                     )
@@ -849,10 +826,14 @@ proxy_check_url: str = "https://api.ipify.org",
                             self._batch_429_count = {}
                         self._batch_429_count[batch_idx] = self._batch_429_count.get(batch_idx, 0) + 1
                         
-                        # If 2+ proxies in same batch get 429, skip the whole batch
-                        if self._batch_429_count[batch_idx] >= 2:
-                            logger.warning("Batch %d has %d rate-limited proxies; skipping batch", 
-                                          batch_idx + 1, self._batch_429_count[batch_idx])
+                        # Only skip batch if ALL valid proxies have been tried AND 2+ got 429
+                        validated_count = len(self._batch_validated.get(batch_idx, []))
+                        failed_count = len(self._batch_failed_proxies.get(batch_idx, set()))
+                        tried_count = failed_count + len(self._batch_successful_proxies.get(batch_idx, []))
+                        
+                        if self._batch_429_count[batch_idx] >= 2 and tried_count >= validated_count:
+                            logger.warning("Batch %d: all %d valid proxies tried, %d rate-limited; skipping batch", 
+                                          batch_idx + 1, validated_count, self._batch_429_count[batch_idx])
                             self._mark_batch_rate_limited(batch_idx)
                     continue
                 
@@ -860,8 +841,8 @@ proxy_check_url: str = "https://api.ipify.org",
                 if status_code in {500, 502, 503, 504, 522, 524} and attempt < self.max_retries:
                     retry_after = response.headers.get("Retry-After")
                     wait = min(
-                        float(retry_after) if retry_after and retry_after.isdigit() else (2.0 * (attempt + 1)),
-                        20.0,
+                        float(retry_after) if retry_after and retry_after.isdigit() else (1.0 * (attempt + 1)),
+                        5.0,
                     )
                     logger.warning(
                         "Signup retryable response for %s (status %s); waiting %.1fs",
@@ -878,6 +859,11 @@ proxy_check_url: str = "https://api.ipify.org",
                     status_code,
                     response_json,
                 )
+                try:
+                    with SQLiteManager(self.db_path) as db:
+                        db.save_signup_result(current_user.username, False, status_code, str(response_json))
+                except Exception as exc:  # noqa: BLE001
+                    logger.error("Failed to save signup result: %s", exc)
                 return SignupResult(
                     user=current_user,
                     success=False,
@@ -901,11 +887,16 @@ proxy_check_url: str = "https://api.ipify.org",
                     logger.warning("Request error for %s: %s; rotating proxy (attempt %d/%d)", current_user.username, exc, attempt + 1, self.max_retries)
                     continue
                 if attempt < self.max_retries:
-                    wait = min(1.0 + (attempt * 1.5), 10.0)
+                    wait = min(0.5 + (attempt * 0.5), 3.0)
                     logger.warning("Signup request error for %s: %s; retrying in %.1fs", current_user.username, exc, wait)
                     time.sleep(wait)
                     continue
                 logger.error("Signup request failed for %s: %s", current_user.username, exc)
+        try:
+            with SQLiteManager(self.db_path) as db:
+                db.save_signup_result(current_user.username, False, None, str(last_exc) if last_exc else "unknown error")
+        except Exception as exc2:  # noqa: BLE001
+            logger.error("Failed to save signup result: %s", exc2)
         return SignupResult(
             user=current_user,
             success=False,

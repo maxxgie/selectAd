@@ -54,16 +54,13 @@ def cmd_generate(args: argparse.Namespace, cfg) -> int:
 def cmd_submit(args: argparse.Namespace, cfg) -> int:
     count = args.limit or cfg.users_to_generate
 
-    # Delete old DB contents and start fresh
-    with SQLiteManager(cfg.db_path) as db:
-        db.delete_all_users()
-
+    # Generate new users (don't delete existing ones from DB)
     generator = UserGenerator(country=cfg.country, default_password=cfg.default_password, username_length=cfg.username_length)
     users = generator.generate(count)
 
     with SQLiteManager(cfg.db_path) as db:
         inserted = db.insert_users(users)
-    logger.info("Generated %d users for submission", inserted)
+    logger.info("Generated %d users for submission (%d total in DB)", inserted, count)
 
     CSVExporter(cfg.csv_path).export(users)
     JSONExporter(cfg.json_path).export(users)

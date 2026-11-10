@@ -17,10 +17,22 @@ class JSONExporter:
         self.output_path.parent.mkdir(parents=True, exist_ok=True)
 
     def export(self, users: List[TestUser]) -> Path:
-        """Write users to JSON and return the output path."""
-        data = [user.to_dict() for user in users]
+        """Append users to JSON (preserving existing data). Returns the output path."""
+        self.output_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        existing = []
+        if self.output_path.exists() and self.output_path.stat().st_size > 0:
+            try:
+                with self.output_path.open("r", encoding="utf-8") as fh:
+                    existing = json.load(fh)
+            except (json.JSONDecodeError, ValueError):
+                existing = []
+        
+        for user in users:
+            existing.append(user.to_dict())
+        
         with self.output_path.open("w", encoding="utf-8") as fh:
-            json.dump(data, fh, indent=2, ensure_ascii=False)
+            json.dump(existing, fh, indent=2, ensure_ascii=False)
         return self.output_path
 
     def import_users(self, input_path: str | Path | None = None) -> List[TestUser]:

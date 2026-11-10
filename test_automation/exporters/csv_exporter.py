@@ -28,10 +28,16 @@ class CSVExporter:
         self.output_path.parent.mkdir(parents=True, exist_ok=True)
 
     def export(self, users: List[TestUser]) -> Path:
-        """Write users to CSV and return the output path."""
-        with self.output_path.open("w", newline="", encoding="utf-8") as fh:
+        """Append users to CSV (preserving existing data). Returns the output path."""
+        self.output_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Check if file exists and has header
+        file_exists = self.output_path.exists() and self.output_path.stat().st_size > 0
+        
+        with self.output_path.open("a", newline="", encoding="utf-8") as fh:
             writer = csv.DictWriter(fh, fieldnames=self.FIELDNAMES)
-            writer.writeheader()
+            if not file_exists:
+                writer.writeheader()
             for user in users:
                 writer.writerow(user.to_dict())
         return self.output_path
