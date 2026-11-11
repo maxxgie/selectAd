@@ -1,8 +1,8 @@
 {
   "person": "default",
   "sponsor_id": "ASD9736963",
-  "api_url": "https://adselect.biz/api/auth/register",
-  "source_url": "https://adselect.biz/register?ref=ASD9736963",
+  "api_url": "https://adselect.world/api/auth/register",
+  "source_url": "https://adselect.world/register?ref=ASD9736963",
   "country": "United States",
   "default_password": "12345678",
   "notes": "Edit sponsor_id, api_url, and source_url to target a different person/account."
