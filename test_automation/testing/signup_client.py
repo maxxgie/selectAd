@@ -463,7 +463,15 @@ proxy_check_url: str = "https://api.ipify.org",
         # Rest pool also empty - FULLY EXHAUSTED: reload all proxies and start over
         logger.info("All batches and rest pool exhausted; reloading all proxies and starting fresh")
         self._reload_all_proxies()
-        return self._get_current_batch()
+        # Only recurse if the reload actually produced batches. When the proxy
+        # pool is genuinely empty (or the backup/main files are empty),
+        # _reload_all_proxies -> _organize_all_batches leaves _all_batches == []
+        # and resets _main_batches_exhausted, so an unconditional recursion
+        # would repeat the same empty state forever (RecursionError).
+        if self._all_batches:
+            return self._get_current_batch()
+        logger.warning("No proxies available after reload; cannot continue")
+        return None
 
     def _check_rest_pool(self) -> None:
         """No-op: rest pool is checked lazily in _get_current_batch"""
